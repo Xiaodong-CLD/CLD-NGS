@@ -27,7 +27,7 @@ Once you log back in, you should see something like:
 
 Obtain the package file from Lijuan, and run
 
-conda create -n variant-calling --file package-list.txt
+conda create -n variant-calling --file package-list.txt 
 NOTE - From this point on, whenever you open a new putty window and log into HPC server, please make sure to type in
 conda activate variant-calling
 Whenever you are running your pipeline, please make sure you see (variant-calling) written at the begining of your username screen.
