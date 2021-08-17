@@ -23,7 +23,7 @@ You can install *Putty* on your system from [Takeda SharePoint](https://mytakeda
 
 ###### 1.2 Getting the right working Environment.
 Once you have *Putty* on your system, you need to log-in to Takeda's HPC cluster. At the time of writing this document, the Node Address is: *US HPC LOGIN NODE: 10.245.45.40* [Takeda HPC](https://conf-rds.takeda.com/display/DEET/HPC
-You enter ```CUI3008@10.245.45.40``` in *Host Name* form field and click on *Open*. Enter you password and you should see something like:
+You enter ```CUI3008@hpclogin1.rda.onetakeda.com``` in *Host Name* form field and click on *Open*. Enter you password and you should see something like:
 		```cui3008@insight-hpc-login2  $```
         
 Although, this pipeline can run on almost all the Unix/Linux environment, it is highly recommened to set up a *conda* environment on your Linux system.
