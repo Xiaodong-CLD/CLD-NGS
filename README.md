@@ -116,10 +116,10 @@ You can check everything was alright using the command:
 	```ls```
 
 Use the following command to enter the code repository:
-	```cd variant-calling-pipeline```
+	```cd voof```
     
 The key directory of interest is *pipeline*, so go to pipeline directory using:
-	```cd pipeline/```
+	```cd amp-pip/```
     
 ###### 2.3 Run the tool requirement check file here.
 
