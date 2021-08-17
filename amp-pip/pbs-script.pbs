@@ -1,0 +1,14 @@
+#PBS -N sample-pbs-script
+#PBS -l nodes=12:ppn=10,walltime=100:00:00,mem=150gb
+#PBS -j oe
+#PBS -o /mnt/efs/home/cui3008/variant-calling-pipeline/data/hpc-output/pbs-output.out
+
+#Change the working directory.
+cd /mnt/efs/home/cui3008/variant-calling-pipeline/pipeline/
+
+#Activate the conda environment.
+source /mnt/efs/home/cui3008/miniconda3/bin/activate
+conda activate variant-calling
+
+#Execute the pipeline.
+python3 pipeline_runner.py -d ../../genewiz-data/amplicon/poc-test -r ../data/reference/processed/native.fasta

@@ -1,0 +1,14 @@
+#PBS -N RNAseq-ADAMTS13
+#PBS -l nodes=12:ppn=12,walltime=100:00:00,mem=150gb
+#PBS -j oe
+#PBS -o /mnt/efs/home/oqh2473/test/hpc-output
+# read length 150bp
+
+
+source /mnt/efs/home/oqh2473/miniconda3/bin/activate
+conda activate RNAseq
+
+/mnt/efs/home/oqh2473/pipeline_test/RNA_pipeline/RNAseq_pipeline.sh \
+-d /mnt/efs/home/oqh2473/pipeline_test/RNA_pipeline/HD-N62-F23 \
+-g /mnt/efs/home/cui3008/reference_genome/RNAseq_genome/ncbi/cho_k1_ncbi_star_2.7 \
+-o /mnt/efs/home/oqh2473/pipeline_test/RNA_pipeline/output
