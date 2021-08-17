@@ -108,7 +108,7 @@ The second step is to get the code base for you pipeline. We will use *GIT* soft
 	```conda install -c anaconda git```
     
 Then, to get the code repository:
-	```git clone ssh://git@bb-rds.takeda.com:8080/var/variant-calling-pipeline.git```
+	```git clone ssh://git@bb-rds.takeda.com:8080/cldngs/voof.git```
     
 If you get a permission error, then please ask Dr. Shen to give you a permission to get the repo. But if you are able to access this document, you most probably already have the permission to run the command.
 
