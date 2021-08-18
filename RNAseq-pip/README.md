@@ -1,11 +1,12 @@
 # Welcome to Cell Line Development RNA-seq pipeline
 
 In this documentation, we will go through steps to:
-	1. Set up a working environment.
-	2. How to prepare data for your pipeline (refer to amplicon-seq).
-	3. Run pipeline. 
-	4. Example code
-	5. Generate customized reference genome for future usage. 
+
+	1. Set up a working environment.\
+	2. How to prepare data for your pipeline (refer to amplicon-seq).\
+	3. Run pipeline. \
+	4. Example code.\
+	5. Generate customized reference genome for future usage. \
 	
 This instruction omits the steps of accessing HPC cluster described in the main tutorial. 
 
