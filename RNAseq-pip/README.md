@@ -103,16 +103,25 @@ You may not be able to run this code since you don't have the permission to writ
 
 ### 5. Generate customized reference genome for future usage.
 To generate a customized STAR-built reference genome, the following files are needed (I use ADAMTS13 as example): 
+
 1. The sequence of gene of interest fasta file
+
 ```/mnt/efs/home/cui3008/reference_genome/RNAseq_genome/ncbi/ADAMTS13.fa```
+
 2. The annotation of gene of interest (.gtf). 
+
 ```/mnt/efs/home/cui3008/reference_genome/RNAseq_genome/ncbi/ADAMTS13.gtf```
-This file need to be manually write. You can refer ADAMTS13 format. 
+
+This file need to be manually write. You can use ADAMTS13.gtf as template. 
+
 3. The sequence of CHO genome
+
 ```/mnt/efs/home/cui3008/reference_genome/RNAseq_genome/ncbi/GCF_003668045.3_CriGri-PICRH-1.0_genomic.fna``` 
 
 4. The annotation of CHO genome
+
  ```/mnt/efs/home/cui3008/reference_genome/RNAseq_genome/ncbi/GCF_003668045.3_CriGri-PICRH-1.0_genomic.gtf```
+ 
 CHO genome sequence and annotation are downloaded from 
  https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/003/668/045/GCF_003668045.3_CriGri-PICRH-1.0/
 
@@ -120,6 +129,7 @@ Then we will make customized CHO+goi genome:
 
 	cat ADAMTS13.fa GCF_003668045.3_CriGri-PICRH-1.0_genomic.fna > adam_cho.fa
 	cat ADAMTS13.gtf GCF_003668045.3_CriGri-PICRH-1.0_genomic.gtf > adam_cho.gtf
+    
 Use STAR to build reference genome for alignment:
 
 	STAR --runMode genomeGenerate --runThreadN 8 \
