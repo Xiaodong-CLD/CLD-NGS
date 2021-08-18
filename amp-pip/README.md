@@ -82,14 +82,15 @@ By ```ls``` you will see a list of fastq files in the folder
 Step 2: Use the code below to move the two fastq files. You need to change ```/path/to/Fastq/``` to your Fastq folder path at first. 
 
 	for f in /path/to/Fastq/*; do
-	b=`basename $f`
-	echo ${b%%\_*}
-	c=${b%%\_*}
-	mkdir /path/to/Fastq/$c
-	cp $c* /path/to/Fastq/$c
-	mv *R1*gz $c.R1.fastq.gz
-	mv *R2*gz $c.R2.fastq.gz
-	done
+    b=`basename $f`
+    echo ${b%%\_*}
+    c=${b%%\_*}
+    mkdir /path/to/Fastq/$c
+    mv $c* /path/to/Fastq/$c
+    cd /path/to/Fastq/$c
+    mv *R1*gz $c.R1.fastq.gz
+    mv *R2*gz $c.R2.fastq.gz
+    done
 
 If you are not comfortable with this method, you can always do it manually (please refer the exact steps in previous pipeline tutorial). 
 
