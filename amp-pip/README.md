@@ -104,7 +104,7 @@ Also, please make sure that the name: *cell-line-name.R1.fastq.gz* matches the d
 
 There are several aspects and ways in which you can run the pipeline. But the easiest way is using the following command:
 
-```python3 /mnt/efs/home/cui3008/voof/amp-pip/pipeline.py -r /path/to/reference.fasta -f1 /path/to/sample-name.R1.fastq.gz -f2 /path/to/sample-name.R1.fastq.gz```
+```python3 /mnt/efs/home/cui3008/voof/amp-pip/pipeline.py -r /path/to/reference.fasta -f1 /path/to/sample-name.R1.fastq.gz -f2 /path/to/sample-name.R2.fastq.gz```
 
 This will show a lot of text/messages on your screen and can take a lot of time to run depending upon the system you have.
 
