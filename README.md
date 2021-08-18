@@ -148,7 +148,7 @@ Cyberduck is a good file transfer tool to copy and paste data from your local di
 *Note:* We usually do not store data on Bitbucket/GIT, and so you'll have to transfer the data using other means. We're still working on managing optimal sharing of data.
 
 
-###### 2.4 Organize data files
+###### 2.5 Organize data files
 
 Our goal is to organize two reads of fastq files from each sample to an individual folder, which is named as sample name. 
 
