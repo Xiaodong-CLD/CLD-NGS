@@ -87,9 +87,8 @@ Step 2: Use the code below to move the two fastq files. You need to change ```/p
     c=${b%%\_*}
     mkdir /path/to/Fastq/$c
     mv $c* /path/to/Fastq/$c
-    cd /path/to/Fastq/$c
-    mv *R1*gz $c.R1.fastq.gz
-    mv *R2*gz $c.R2.fastq.gz
+    mv /path/to/Fastq/$c/*R1*gz /path/to/Fastq/$c/$c.R1.fastq.gz
+    mv /path/to/Fastq/$c/*R2*gz /path/to/Fastq/$c/$c.R2.fastq.gz
     done
 
 If you are not comfortable with this method, you can always do it manually (please refer the exact steps in previous pipeline tutorial). 
