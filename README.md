@@ -109,11 +109,11 @@ Please select *SSH Keys* from the left column and click on *Add Key* and paste y
 ###### 2.2 Installing the Tools
 The second step is to get the code base for you pipeline. We will use *GIT* software to manage everything on the system. I would expect *GIT* to be already there on your system, but if it isn't there, then you can always install it using:
 
-	```conda install -c anaconda git```
+	conda install -c anaconda git
     
 Then, to get the code repository:
 
-	```git clone ssh://git@bb-rds.takeda.com:8080/cldngs/voof.git```
+	git clone ssh://git@bb-rds.takeda.com:8080/cldngs/voof.git
     
 If you get a permission error, then please ask Dr. Shen to give you a permission to get the repo. But if you are able to access this document, you most probably already have the permission to run the command.
 
