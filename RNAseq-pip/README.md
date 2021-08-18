@@ -2,11 +2,11 @@
 
 In this documentation, we will go through steps to:
 
-  1. Set up a working environment.\
-  2. How to prepare data for your pipeline (refer to amplicon-seq).\
-  3. Run pipeline. \
-  4. Example code.\
-  5. Generate customized reference genome for future usage. \
+  1. Set up a working environment.
+  2. How to prepare data for your pipeline (refer to amplicon-seq).
+  3. Run pipeline. 
+  4. Example code.
+  5. Generate customized reference genome for future usage. 
 
 This instruction omits the steps of accessing HPC cluster described in the main tutorial. 
 
@@ -46,7 +46,9 @@ If all worked fine, your username line would look like:
 ### 2. Prepare Data for your Pipeline.
 ###### 2.1 Locate pipeline
 There are two ways to get pipeline: 
-1) Directly execute the scripts saved in ```/mnt/efs/home/cui3008/voof```   
+
+1) Directly execute the scripts saved in ```/mnt/efs/home/cui3008/voof```  
+
 2) Download the scripts from Bitbucket as described in 2.1 (omit in this page)
 
 	
@@ -59,6 +61,7 @@ For RNA-seq analysis, the executable script is
 Our goal is to organize two reads of fastq files from each sample to an individual folder, which is named as sample name. Please refer the tutorial in amplicon-seq or do it manually. 
 
 Your final file name should be named as : *cell-line-name.R1.fastq.gz*, *cell-line-name.R2.fastq.gz*
+
 Also, please make sure that the name: *cell-line-name.R1.fastq.gz* matches the directory name in which it exists.
 
 
@@ -78,6 +81,7 @@ This pipeline is designed for gene of interest ADAMTS13. If we want to apply it 
 -o is the user-defined output directory. 
  
 A *Portable Bash Script (PBS)* is what you need to access Takeda's HPC. A script has already been written for you.
+
 The script can be submitted using the command:
 	```qsub pbs-script.pbs```
 
@@ -133,8 +137,11 @@ Next, we need to edit RoarChim.sh to change some variables. Please save RoarChim
 	bed=/mnt/efs/home/cui3008/reference_genome/RNAseq_genome/ncbi/ADAMTS13.bed
 
 Change the above variables as needed.
+
 Then scan the script to change anywhere of 'ADAMTS13' to the name of gene of interest. 
+
 At last, run the pipeline with the new RoarChim.sh with your fastq directory and new reference genome path.  
+
 For any questions, feel free to email Ltongyu@umich.edu
 	
 
