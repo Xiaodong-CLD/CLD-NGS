@@ -78,7 +78,7 @@ This pipeline is designed for gene of interest ADAMTS13. If we want to apply it 
 
  -d is the directory of two fastq files for each sample.
 -g is the STAR-built reference genome. You don't have to change it for ADAMTS13 runs.
--o is the user-defined output directory. 
+-o is the user-defined directory path to save final outputs. 
  
 A *Portable Bash Script (PBS)* is what you need to access Takeda's HPC. A script has already been written for you.
 
@@ -86,11 +86,17 @@ The script can be submitted using the command:
 	```qsub pbs-script.pbs```
 
 ### 4. Example code to run pipeline
+
 Path of execuable pipeline.py
+
  ```/mnt/efs/home/cui3008/voof/RNAseq-pip/RoarChim.sh```
+ 
  Path of reference fasta
+ 
  ```/mnt/efs/home/cui3008/reference_genome/RNAseq_genome/ncbi/cho_k1_ncbi_star_2.7```
+ 
  Path of the folder stores two fastq files for one sample
+ 
  ```/mnt/efs/home/oqh2473/pipeline_test/RNA_pipeline/HD-N62-F23```
 
 Then the command to run the code should be : 
