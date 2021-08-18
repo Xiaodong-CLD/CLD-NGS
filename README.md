@@ -152,11 +152,11 @@ Cyberduck is a good file transfer tool to copy and paste data from your local di
 
 Our goal is to organize two reads of fastq files from each sample to an individual folder, which is named as sample name. 
 
-A little magic you can use here: 
+A little magic you can do here: 
 
 Step 1: Transfer the Fastq folder from scientific drive to HPC. 
 
-```cd /path/to/fastq```
+	cd /path/to/fastq
 By ```ls``` you will see a list of fastq files in the folder
 
 Step 2: Use the code below to move the two fastq files. You need to change ```/path/to/Fastq/``` to your Fastq folder path at first. 
@@ -166,7 +166,8 @@ Step 2: Use the code below to move the two fastq files. You need to change ```/p
 	echo ${b%%\_*}
 	c=${b%%\_*}
 	mkdir /path/to/Fastq/$c
-	cp $c* /path/to/Fastq/$c
+	mv $c* /path/to/Fastq/$c
+    cd /path/to/Fastq/$c
 	mv *R1*gz $c.R1.fastq.gz
 	mv *R2*gz $c.R2.fastq.gz
 	done
