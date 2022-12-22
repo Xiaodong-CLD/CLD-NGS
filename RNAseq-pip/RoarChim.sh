@@ -108,7 +108,7 @@ then
   varscan pileup2indel $base.targeted.hqa.mpileup  > $fq_dir/$base.targeted.hqa.mpileup.indel.vcf
   varscan pileup2cns $base.targeted.hqa.mpileup  > $fq_dir/$base.targeted.hqa.mpileup.consensus.vcf
   # Amino acid annotation on varscan snp report
-  python3 ../amino-anno/from_varscan.py $fq_dir/$base.targeted.hqa.mpileup.snp.vcf $goi_seq -o $fq_dir
+  python3 /mnt/efs/home/cui3008/repos_December2022/voof/amino-anno/from_varscan.py  $fq_dir/$base.targeted.hqa.mpileup.snp.vcf $goi_seq -o $fq_dir
   mv  *vcf $out_dir/
 else echo "Takeda pipeline: vcf files already exist...skipping"
 fi
