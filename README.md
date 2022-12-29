@@ -20,7 +20,7 @@ If this conda installation isn't currently in your PATH:
 1. `cd /mnt/efs/home/cui3008/zack_miniconda/miniconda3/bin`
 2. `./conda init bash`. This will configure the conda installation in your `~/.bashrc` file. Close and reopen your ssh connection for the changes to take effect.
 
-## Converting SnapGene .dna file to .fasta
+### Converting SnapGene .dna file to .fasta
 This may be necessary if a reference sequence e.g. GOI sequence is provided as a `.dna` file instead of `.fasta`.
 
 1. Install biopython package with `conda install -c conda-forge biopython`
