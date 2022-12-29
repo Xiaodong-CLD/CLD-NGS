@@ -1,0 +1,15 @@
+#!/bin/bash -l
+#SBATCH -J amplicon_combined_pipeline
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=24
+#SBATCH --time=0-10:00:00
+#SBATCH --qos=normal
+ 
+echo "== Starting run at $(date)"
+echo "== Job ID: ${SLURM_JOBID}"
+echo "== Node list: ${SLURM_NODELIST}"
+echo "== Submit dir. : ${SLURM_SUBMIT_DIR}"
+# Your more useful application can be started below!
+
+conda activate variant-calling
+python /mnt/efs/home/cui3008/repos_December2022/voof/amp-pip/pipeline_combined.py /mnt/efs/home/cui3008/demos_20221222/amplicon_may2022
