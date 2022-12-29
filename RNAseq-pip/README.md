@@ -3,62 +3,22 @@
 In this documentation, we will go through steps to:
 
   1. Set up a working environment.
-  2. How to prepare data for your pipeline (refer to amplicon-seq).
+  2. How to prepare data for your pipeline.
   3. Run pipeline. 
-  4. Example code.
-  5. Generate customized reference genome for future usage. 
+  4. Generate customized reference genome for future usage. 
 
-This instruction omits the steps of accessing HPC cluster described in the main tutorial. 
 
 ### 1. Setting up the working environment.
+1. Setup conda installation following the instructions in the main repository README.
+2. `conda activate RNAseq`. The `RNAseq` environment already exists on the Slurm HPC, but `RNAseq.yml` contains an export of the packages in case conda needs to be reinstalled.
 
-###### 1.1 Installing the Tools
-
-
-	conda create -n RNAseq
-	conda activate RNAseq
-	conda install python=3.7.6
-	conda install -c r r
-	conda install -c r r-ggplot2
-	conda install -c bioconda samtools=1.9
-	conda install -c bioconda star=2.7.9
-	conda install -c bioconda fastp=0.20.1
-	conda install -c bioconda varscan=2.4.4
-	conda install -c bioconda pindel=0.2.5b9
-	conda install -c bioconda htseq=0.11.3
-	conda install -c bioconda picard=2.18.29
-	
-   ###### NOTE - From this point on, whenever you open a new putty window and log into HPC server, please make sure to type in 
-Whenever you are running your pipeline, please make sure you see *(RNAseq)* written at the begining of your username screen.
-
-It should look like: ```(RNAseq) [cui3008@insight-hpc-login2 ~]$```. This *(RNAseq)* at the beginning is extremly important.
-
-
-If all worked fine, your username line would look like:
-
-```(RNAseq) [cui3008@insight-hpc-login2 ~]$```
-
-
-
-
-    
-    
 ### 2. Prepare Data for your Pipeline.
 ###### 2.1 Locate pipeline
-There are two ways to get pipeline: 
+For RNA-seq analysis, the executable script is `RoarChim.sh`
 
-1) Directly execute the scripts saved in ```/mnt/efs/home/cui3008/voof```  
+###### 2.2 Organize data files
 
-2) Download the scripts from Bitbucket as described in 2.1 (omit in this page)
-
-	
-For RNA-seq analysis, the executable script is 
-    ```/mnt/efs/home/cui3008/voof/RNAseq-pip/RoarChim.sh``` 
-
-
-###### 2.3 Organize data files
-
-Our goal is to organize two reads of fastq files from each sample to an individual folder, which is named as sample name. Please refer the tutorial in amplicon-seq or do it manually. 
+Our goal is to organize two reads of fastq files from each sample to an individual folder, which is named as sample name.
 
 Your final file name should be named as : *cell-line-name.R1.fastq.gz*, *cell-line-name.R2.fastq.gz*
 
@@ -68,46 +28,17 @@ Also, please make sure that the name: *cell-line-name.R1.fastq.gz* matches the d
 ### 3. Running the Variant Calling Pipeline.
 
 ###### 3.1 Standard Running & Testing the Pipeline
-This pipeline is designed for gene of interest ADAMTS13. If we want to apply it to other gene of interest, please refer to *Session 4. Generate cutomized reference genome for future usage*. 
+This pipeline is designed for gene of interest ADAMTS13. If we want to apply it to other gene of interest, please refer to *Section 4. Generate cutomized reference genome for future usage*. 
 
+See `job.script` for an example Slurm script containing the call to `RoarChim.sh`. Submit a job to the queue with `sbatch job.script`.
 
-		/mnt/efs/home/cui3008/voof/RNAseq-pip/RoarChim.sh \
-		-d /path/to/sample/fastq/folder/HD-N62-F23 \
-		-g /mnt/efs/home/cui3008/reference_genome/RNAseq_genome/ncbi/cho_k1_ncbi_star_2.7 \
-		-o /path/to/output/RNA_pipeline/output
+RoarChim.sh takes three arguments:
 
- -d is the directory of two fastq files for each sample.
--g is the STAR-built reference genome. You don't have to change it for ADAMTS13 runs.
--o is the user-defined directory path to save final outputs. 
- 
-A *Portable Bash Script (PBS)* is what you need to access Takeda's HPC. A script has already been written for you.
-
-The script can be submitted using the command:
-	```qsub pbs-script.pbs```
-
-### 4. Example code to run pipeline
-
-Path of execuable pipeline.py
-
- ```/mnt/efs/home/cui3008/voof/RNAseq-pip/RoarChim.sh```
- 
- Path of reference fasta
- 
- ```/mnt/efs/home/cui3008/reference_genome/RNAseq_genome/ncbi/cho_k1_ncbi_star_2.7```
- 
- Path of the folder stores two fastq files for one sample
- 
- ```/mnt/efs/home/oqh2473/pipeline_test/RNA_pipeline/HD-N62-F23```
-
-Then the command to run the code should be : 
-
-	/mnt/efs/home/cui3008/voof/RNAseq-pip/RoarChim.sh \
-	-d /mnt/efs/home/oqh2473/pipeline_test/RNA_pipeline/HD-N62-F23 \
-	-g /mnt/efs/home/cui3008/reference_genome/RNAseq_genome/ncbi/cho_k1_ncbi_star_2.7 \
-	-o /mnt/efs/home/oqh2473/pipeline_test/RNA_pipeline/output
-You may not be able to run this code since you don't have the permission to write in this folder. You can check the files in this folder to understand how the intermediate files saved. 
-
-### 5. Generate customized reference genome for future usage.
+	-d is the directory of two fastq files for each sample.
+	-g is the STAR-built reference genome. You don't have to change it for ADAMTS13 runs.
+	-o is the user-defined directory path to save final outputs. Create this empty directory before running the pipeline.
+	
+### 4. Generate customized reference genome for future usage.
 To generate a customized STAR-built reference genome, the following files are needed (I use ADAMTS13 as example): 
 
 1. The sequence of gene of interest fasta file
@@ -118,7 +49,7 @@ To generate a customized STAR-built reference genome, the following files are ne
 
 ```/mnt/efs/home/cui3008/reference_genome/RNAseq_genome/ncbi/ADAMTS13.gtf```
 
-This file need to be manually write. You can use ADAMTS13.gtf as template. 
+This file needs to be manually written. You can use ADAMTS13.gtf as template. 
 
 3. The sequence of CHO genome
 
