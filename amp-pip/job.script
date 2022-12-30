@@ -12,4 +12,4 @@ echo "== Submit dir. : ${SLURM_SUBMIT_DIR}"
 # Your more useful application can be started below!
 
 conda activate variant-calling
-python /mnt/efs/home/cui3008/repos_December2022/voof/amp-pip/pipeline_combined.py /mnt/efs/home/cui3008/demos_20221222/amplicon_may2022
+python /mnt/efs/home/cui3008/repos_December2022/voof/amp-pip/pipeline_combined.py /mnt/efs/home/cui3008/demos_20221230/amplicon

@@ -11,5 +11,7 @@ echo "== Node list: ${SLURM_NODELIST}"
 echo "== Submit dir. : ${SLURM_SUBMIT_DIR}"
 # Your more useful application can be started below!
 
+mkdir output
+
 conda activate RNAseq
-sh /mnt/efs/home/cui3008/repos_December2022/voof/RNAseq-pip/RoarChim.sh -d /mnt/efs/home/cui3008/demos_20221222/RNA-seq/HD-N85-F30 -g /mnt/efs/home/cui3008/reference_genome/RNAseq_genome/ncbi/cho_k1_ncbi_star_2.7 -o /mnt/efs/home/cui3008/demos_20221222/RNA-seq/output
+sh /mnt/efs/home/cui3008/repos_December2022/voof/RNAseq-pip/RoarChim.sh -d /mnt/efs/home/cui3008/demos_20221230/RNA-seq/HD-N85-F30 -g /mnt/efs/home/cui3008/reference_genome/RNAseq_genome/ncbi/cho_k1_ncbi_star_2.7 -o /mnt/efs/home/cui3008/demos_20221230/RNA-seq/output
