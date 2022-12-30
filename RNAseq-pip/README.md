@@ -1,4 +1,4 @@
-# Welcome to Cell Line Development RNA-seq pipeline
+# Cell Line Development RNA-seq pipeline
 
 In this documentation, we will go through steps to:
 
