@@ -10,7 +10,10 @@ import shlex
 import shutil
 import subprocess
 
-import sys
+# Wrapper for amplicon pipeline that calls pipeline.py.
+# Supports running amplicon pipeline from a configuration spreadsheet,
+# and takes replicates into account when generating a report.
+# Includes the amino acid annotation on the VarScan snp report.
 
 current_dir = pathlib.Path(__file__).parent.resolve()
 
@@ -21,6 +24,7 @@ args = parser.parse_args()
 snp_dfs = []
 clone_samples = defaultdict(list)
 
+# Read in spreadsheet and convert to dict
 config_f = glob.glob(f"{args.input_dir}/*.xlsx")[0]
 config_f_basename = config_f.rstrip('.xlsx')
 sheet = pd.read_excel(config_f, index_col=0)
@@ -63,6 +67,7 @@ for sample_idx in d:
     shutil.copyfile(fq_1_path, fq_1_new_path)
     shutil.copyfile(fq_2_path, fq_2_new_path)
     reference_path = os.path.join(args.input_dir, 'reference', d[sample_idx]['GOI reference file'])
+    # Call pipeline.py for this sample
     subprocess.call(shlex.split(f"python3 {os.path.join(current_dir, 'pipeline.py')} -r {reference_path} -f1 {fq_1_new_path} -f2 {fq_2_new_path}"))
 
     snp_vcf_folder = os.path.join(sample_dir, 'varscan-output')
@@ -74,17 +79,25 @@ for sample_idx in d:
     snp_df = pd.read_csv(snp_vcf_aa_path, sep='\t')
     snp_df.insert(0, 'SampleID', sample_idx)
     snp_df['CloneID'] = fq_clone
+    # Keeping snp output dict for each sample
     snp_dfs.append(snp_df)
 
+# Putting all the individual snp dicts together
 snp_combined_orig = pd.concat(snp_dfs)
+# Dropping unnecessary columns
 snp_combined_orig = snp_combined_orig.drop(['Strands1', 'Strands2', 'Qual1', 'Qual2', 'MapQual1', 'MapQual2'], axis=1)
+# Converting string percentages to float
 snp_combined_orig['VarFreq'] = snp_combined_orig['VarFreq'].apply(lambda x: float(x[:-1]))
+# Dropping all entries with VarFreq < 2%
 snp_combined_orig = snp_combined_orig[snp_combined_orig['VarFreq'] >= 2]
+# Converting back to string
 snp_combined_orig['VarFreq'] = snp_combined_orig['VarFreq'].apply(lambda x: str(x) + '%')
 snp_combined = snp_combined_orig.set_index(['SampleID', 'Position'])
 snp_combined_orig = snp_combined_orig.drop('CloneID', axis=1)
 
 if clone_for_every_sample:
+    # If clone information is provided for every sample,
+    # write out snp report considering the replicates
     by_sample_pos = snp_combined.to_dict('index')
     by_clone_by_pos = defaultdict(lambda: defaultdict(list))
     for k,v in by_sample_pos.items():
@@ -107,7 +120,8 @@ if clone_for_every_sample:
             else:
                 out_f.write(f"{clone_output_df.to_string(index=False)}\n\n")
 else:
-    # Split out by sample
+    # Since clone information wasn't provided for every sample,
+    # we write out the report by individual samples
     with open(f"{config_f_basename}.snp.txt", 'w') as out_f:
         for sample_id in d:
             out_f.write(f"SampleID: {sample_id}\n")
