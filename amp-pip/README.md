@@ -12,7 +12,7 @@
 This version of the amplicon pipeline requires a configuration spreadsheet to run. Please see `example.xlsx` for an example spreadsheet. The speadsheet keeps track of each sample (one per line), and the reference sequence and fastq filenames for each. The `Clone ID` column is optional, and matches replicates together under a Clone ID.
 
 ### Directory structure
-All fastq files go in a `fastq/` directory, and all GOI `.fasta` files go in a `reference/` directory. The configuration spreadsheet goes in the root directory.
+All fastq files go in a `Fastq/` directory, and all GOI `.fasta` files go in a `reference/` directory. The configuration spreadsheet goes in the root directory.
 
 	<input directory>/
 	├─ Fastq/
