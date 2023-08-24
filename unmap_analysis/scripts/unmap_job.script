@@ -1,0 +1,16 @@
+#!/bin/bash -l
+#SBATCH -J Unmap_analysis
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=24
+#SBATCH --time=0-10:00:00
+#SBATCH --qos=normal
+ 
+echo "== Starting run at $(date)"
+echo "== Job ID: ${SLURM_JOBID}"
+echo "== Node list: ${SLURM_NODELIST}"
+echo "== Submit dir. : ${SLURM_SUBMIT_DIR}"
+# Your more useful application can be started below!
+
+
+conda activate unmap_analysis
+/mnt/efs/home/zds0975/pipeline_test/voof/unmap_analysis/scripts/analysis/unmap_analysis.sh /mnt/efs/home/zds0975/unmap_analysis/unmap_analysis/ /mnt/efs/home/zds0975/unmap_analysis/plasmid/plasmid_star_dir/ /mnt/efs/home/zds0975/pipeline_test/voof/unmap_analysis/viral_db/unmasked_virus_dir_v3/
