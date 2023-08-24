@@ -1,7 +1,7 @@
 
 # Cell Line Development amplicon-seq pipeline
 
-## User Manual Amp Var Calling.pdf contains the details about running this pipeline, including setting up environment, preparing data, and modifying code to fit in personal environment. Below is the short version of instruciton on running this pipeline. 
+## User Manual Amp Var Calling.pdf contains the details about running this pipeline, including setting up environment, preparing data, and modifying code to fit in personal environment. Below is the short version of instruction on running this pipeline. 
 
 ## Setting up working environment
 1. Setup conda installation following the instructions in the main repository README or follow the user manual for this pipeline.
