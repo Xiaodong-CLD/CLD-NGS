@@ -1,9 +1,11 @@
 
 # Cell Line Development amplicon-seq pipeline
 
+## User Manual Amp Var Calling.pdf contains the details about running this pipeline, including setting up environment, preparing data, and modifying code to fit in personal environment. Below is the short version of instruciton on running this pipeline. 
+
 ## Setting up working environment
-1. Setup conda installation following the instructions in the main repository README.
-2. `conda activate variant-calling`. The `variant-calling` environment already exists on the Slurm HPC, but `variant-calling.yml` contains an export of the packages in case conda needs to be reinstalled.
+1. Setup conda installation following the instructions in the main repository README or follow the user manual for this pipeline.
+2. `conda activate variant-calling`. `variant-calling.yml` contains an export of the packages in case conda needs to be reinstalled.
 
 ## Running pipeline
 ### Preparing configuration spreadsheet
@@ -13,7 +15,7 @@ This version of the amplicon pipeline requires a configuration spreadsheet to ru
 All fastq files go in a `fastq/` directory, and all GOI `.fasta` files go in a `reference/` directory. The configuration spreadsheet goes in the root directory.
 
 	<input directory>/
-	├─ fastq/
+	├─ Fastq/
 	│  ├─ All forward and reverse fastq files referenced in spreadsheet go here
 	├─ reference/
 	│  ├─ All reference .fasta files in spreadsheet go here

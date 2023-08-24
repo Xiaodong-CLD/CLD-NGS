@@ -79,6 +79,7 @@ def plot_coverage_plots_manager(input_dir):
         return False
 
     input_dir = '/'.join(input_dir.split('/')[:-1])
+    input_dir = os.path.dirname(input_dir)
 
     #Create a output direcotry for plotly.
     plotly_output_dir_path = create_plotly_output_directory(input_dir)

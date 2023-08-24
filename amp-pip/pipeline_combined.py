@@ -15,6 +15,10 @@ import subprocess
 # and takes replicates into account when generating a report.
 # Includes the amino acid annotation on the VarScan snp report.
 
+def name(string):
+    prefix = string.split("_L")[0]
+    return prefix
+
 current_dir = pathlib.Path(__file__).parent.resolve()
 
 parser = argparse.ArgumentParser()
@@ -33,11 +37,11 @@ d = sheet.to_dict(orient='index')
 
 clone_for_every_sample = True
 for sample_idx in d:
-    sample_dir = os.path.join(args.input_dir, str(sample_idx))
-    pathlib.Path.mkdir(sample_dir)
-    
+    naming = name(d[sample_idx]['fastq (forward)'])
+    sample_dir = os.path.join(args.input_dir, naming)
+    pathlib.Path(sample_dir).mkdir(parents=True, exist_ok=True)
     fq_clone = d[sample_idx]['Clone ID (optional)']
-    fq_new_base = str(sample_idx)
+
     if fq_clone == '':
         clone_for_every_sample = False
     else:
@@ -50,7 +54,7 @@ for sample_idx in d:
     else:
         ext_1 = '.fq'
     fq_1_split = fq_1_name.split(ext_1)
-    fq_1_new_name = f"{fq_new_base}.R1{ext_1}{fq_1_split[1]}"
+    fq_1_new_name = f"{naming}.R1{ext_1}{fq_1_split[1]}"
 
     fq_2_name = d[sample_idx]['fastq (reverse)']
     if '.fastq' in fq_2_name:
@@ -58,10 +62,10 @@ for sample_idx in d:
     else:
         ext_2 = '.fq'
     fq_2_split = fq_2_name.split(ext_1)
-    fq_2_new_name = f"{fq_new_base}.R2{ext_2}{fq_2_split[1]}"
+    fq_2_new_name = f"{naming}.R2{ext_2}{fq_2_split[1]}"
 
-    fq_1_path = os.path.join(args.input_dir, 'fastq', fq_1_name)
-    fq_2_path = os.path.join(args.input_dir, 'fastq', fq_2_name)
+    fq_1_path = os.path.join(args.input_dir, 'Fastq', fq_1_name)
+    fq_2_path = os.path.join(args.input_dir, 'Fastq', fq_2_name)
     fq_1_new_path = os.path.join(sample_dir, fq_1_new_name)
     fq_2_new_path = os.path.join(sample_dir, fq_2_new_name)
     shutil.copyfile(fq_1_path, fq_1_new_path)
@@ -69,10 +73,10 @@ for sample_idx in d:
     reference_path = os.path.join(args.input_dir, 'reference', d[sample_idx]['GOI reference file'])
     # Call pipeline.py for this sample
     subprocess.call(shlex.split(f"python3 {os.path.join(current_dir, 'pipeline.py')} -r {reference_path} -f1 {fq_1_new_path} -f2 {fq_2_new_path}"))
-
+    
     snp_vcf_folder = os.path.join(sample_dir, 'varscan-output')
-    snp_vcf_path = os.path.join(snp_vcf_folder, f"{fq_new_base}.snp.vcf")
-    snp_vcf_aa_path = os.path.join(snp_vcf_folder, f"{fq_new_base}.snp.amino_annotated.vcf")
+    snp_vcf_path = os.path.join(snp_vcf_folder, f"{naming}.snp.vcf")
+    snp_vcf_aa_path = os.path.join(snp_vcf_folder, f"{naming}.snp.amino_annotated.vcf")
     # Run amino acid annotation on varscan snp output
     subprocess.call(shlex.split(f"python3 {os.path.join(current_dir, '..', 'amino-anno', 'from_varscan.py')} {snp_vcf_path} {reference_path} -o {snp_vcf_folder}"))
 
@@ -92,27 +96,33 @@ snp_combined_orig['VarFreq'] = snp_combined_orig['VarFreq'].apply(lambda x: floa
 snp_combined_orig = snp_combined_orig[snp_combined_orig['VarFreq'] >= 2]
 # Converting back to string
 snp_combined_orig['VarFreq'] = snp_combined_orig['VarFreq'].apply(lambda x: str(x) + '%')
-snp_combined = snp_combined_orig.set_index(['SampleID', 'Position'])
+
+# Adding the 'Cons' column to the index
+snp_combined = snp_combined_orig.set_index(['SampleID', 'Position', 'Cons'])
 snp_combined_orig = snp_combined_orig.drop('CloneID', axis=1)
 
 if clone_for_every_sample:
-    # If clone information is provided for every sample,
-    # write out snp report considering the replicates
-    by_sample_pos = snp_combined.to_dict('index')
-    by_clone_by_pos = defaultdict(lambda: defaultdict(list))
-    for k,v in by_sample_pos.items():
-        by_clone_by_pos[v['CloneID']][k[1]].append(k[0])
+    by_sample_pos_cons = snp_combined.to_dict('index')
+    by_clone_by_pos_cons = defaultdict(lambda: defaultdict(list))
+    for k,v in by_sample_pos_cons.items():
+        by_clone_by_pos_cons[v['CloneID']][k[1:]].append(k[0])  # k[1:] corresponds to ('Position', 'Cons')
 
     with open(f"{config_f_basename}.snp.txt", 'w') as out_f:
         for clone_id,sample_ids in clone_samples.items():
             clone_output_df = pd.DataFrame()
             sample_l = clone_samples[clone_id]
-            pos_samples = by_clone_by_pos[clone_id] 
-            for pos in pos_samples:
-                if pos_samples[pos] == sample_l:
-                    for s in sample_l:
-                        row = snp_combined_orig.query("SampleID == @s and Position == @pos")
+            if len(sample_l) > 1:
+                pos_cons_samples = by_clone_by_pos_cons[clone_id]
+                for pos_cons in pos_cons_samples:
+                    if len(pos_cons_samples[pos_cons]) > 1:  # only include if a variant (Position + Cons) appears in more than one sample
+                        for s in sample_l:
+                            row = snp_combined_orig.query("SampleID == @s and Position == @pos_cons[0] and Cons == @pos_cons[1]")
+                            clone_output_df = pd.concat([clone_output_df, row]) 
+            else: 
+                for s in sample_l:
+                        row = snp_combined_orig.query("SampleID == @s")
                         clone_output_df = pd.concat([clone_output_df, row]) 
+
             out_f.write(f"CloneID: {clone_id}\n")
             out_f.write(f"Replicate Sample IDs: {', '.join(str(x) for x in sample_l)}\n")
             if clone_output_df.empty:
@@ -120,8 +130,6 @@ if clone_for_every_sample:
             else:
                 out_f.write(f"{clone_output_df.to_string(index=False)}\n\n")
 else:
-    # Since clone information wasn't provided for every sample,
-    # we write out the report by individual samples
     with open(f"{config_f_basename}.snp.txt", 'w') as out_f:
         for sample_id in d:
             out_f.write(f"SampleID: {sample_id}\n")
