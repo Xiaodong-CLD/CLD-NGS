@@ -1,0 +1,35 @@
+#!/bin/bash -l
+#SBATCH -J Star_index
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=24
+#SBATCH --time=0-10:00:00
+#SBATCH --qos=normal
+ 
+echo "== Starting run at $(date)"
+echo "== Job ID: ${SLURM_JOBID}"
+echo "== Node list: ${SLURM_NODELIST}"
+echo "== Submit dir. : ${SLURM_SUBMIT_DIR}"
+# Your more useful application can be started below!
+
+
+conda activate RNAseq
+
+# Modify the file path if needed
+goi_path="/mnt/efs/home/zds0975/0317/goi/C2396-1_BCMA_LTR.fa"
+reference_path="/mnt/efs/home/zds0975/0317/reference/GRCh38_latest_genomic.fna"
+combined_path="/mnt/efs/home/zds0975/0317/combined/combined.fa"
+
+# Index folder name
+goi_index="goi_star_dir"
+reference_index="ref_star_dir"
+combined_index="combined_star_dir"
+
+mkdir -p combined
+
+# Concatenate goi and reference .fa files into combined.fa
+cat ${goi_path} ${reference_path} > ${combined_path}
+
+# Run STAR to create the genome index
+STAR --runMode genomeGenerate --genomeDir ${goi_index} --genomeFastaFiles ${goi_path} --runThreadN 24
+STAR --runMode genomeGenerate --genomeDir ${reference_index} --genomeFastaFiles ${reference_path} --runThreadN 24
+STAR --runMode genomeGenerate --genomeDir ${combined_index} --genomeFastaFiles ${combined_path} --runThreadN 24
