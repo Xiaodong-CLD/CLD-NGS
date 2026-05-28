@@ -1,0 +1,23 @@
+#!/bin/bash -l
+#SBATCH -J amplicon_combined_pipeline
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=24
+#SBATCH --time=0-10:00:00
+#SBATCH --qos=normal
+ 
+echo "== Starting run at $(date)"
+echo "== Job ID: ${SLURM_JOBID}"
+echo "== Node list: ${SLURM_NODELIST}"
+echo "== Submit dir. : ${SLURM_SUBMIT_DIR}"
+# Your more useful application can be started below!
+
+conda activate variant-calling
+
+# Define the path for the script relative to the current directory
+PIPELINE_SCRIPT_PATH="$(dirname "$SLURM_SUBMIT_DIR")/voof/amp-pip/pipeline_combined.py"
+
+# Run the pipeline script with the directory path
+python3 -u "${PIPELINE_SCRIPT_PATH}" "${SLURM_SUBMIT_DIR}"
+
+# Deactivate conda environment if needed
+conda deactivate

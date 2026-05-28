@@ -29,17 +29,22 @@ snp_dfs = []
 clone_samples = defaultdict(list)
 
 # Read in spreadsheet and convert to dict
-config_f = glob.glob(f"{args.input_dir}/*.xlsx")[0]
+config_f = glob.glob(f"{args.input_dir}/sample_xlsx/*.xlsx")[0]
 config_f_basename = config_f.rstrip('.xlsx')
 sheet = pd.read_excel(config_f, index_col=0)
 sheet = sheet.fillna('')
 d = sheet.to_dict(orient='index')
 
+folders_list = list()
 clone_for_every_sample = True
 for sample_idx in d:
     naming = name(d[sample_idx]['fastq (forward)'])
-    sample_dir = os.path.join(args.input_dir, naming)
+    temp_dir = os.path.join(args.input_dir,"Results")
+    sample_dir = os.path.join(temp_dir, naming)
+    #make the output directories
     pathlib.Path(sample_dir).mkdir(parents=True, exist_ok=True)
+    folders_list.append(sample_dir)
+    
     fq_clone = d[sample_idx]['Clone ID (optional)']
 
     if fq_clone == '':
@@ -107,7 +112,7 @@ if clone_for_every_sample:
     for k,v in by_sample_pos_cons.items():
         by_clone_by_pos_cons[v['CloneID']][k[1:]].append(k[0])  # k[1:] corresponds to ('Position', 'Cons')
 
-    with open(f"{config_f_basename}.snp.txt", 'w') as out_f:
+    with open(f"{args.input_dir}/Results/snp.txt", 'w') as out_f:
         for clone_id,sample_ids in clone_samples.items():
             clone_output_df = pd.DataFrame()
             sample_l = clone_samples[clone_id]
@@ -130,7 +135,7 @@ if clone_for_every_sample:
             else:
                 out_f.write(f"{clone_output_df.to_string(index=False)}\n\n")
 else:
-    with open(f"{config_f_basename}.snp.txt", 'w') as out_f:
+    with open(f"{args.input_dir}/Results/snp.txt", 'w') as out_f:
         for sample_id in d:
             out_f.write(f"SampleID: {sample_id}\n")
             sample_df = snp_combined_orig.loc[snp_combined_orig['SampleID'] == sample_id] 

@@ -1,0 +1,26 @@
+#!/bin/bash -l
+#SBATCH -J env_setup
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=24
+#SBATCH --time=0-10:00:00
+#SBATCH --qos=normal
+
+echo "== Starting run at $(date)"
+echo "== Job ID: ${SLURM_JOBID}"
+echo "== Node list: ${SLURM_NODELIST}"
+echo "== Submit dir. : ${SLURM_SUBMIT_DIR}"
+
+# Set permissions for all files and folders in env_setup
+chmod -R 777 "$SLURM_SUBMIT_DIR"
+
+# Set permissions for the voof directory, assuming it's one level up from the script directory
+chmod -R 777 "$(dirname "$SLURM_SUBMIT_DIR")/voof"
+
+# Loop through all .yml files in the env_setup directory and create Conda environments
+for yml_file in "$SLURM_SUBMIT_DIR"/*.yml; do
+    echo "Creating environment from $yml_file..."
+    conda env create -f "$yml_file"
+done
+
+echo "All environments have been created."
+echo "== End of run at $(date)"

@@ -1,8 +1,8 @@
 #!/bin/bash -l
 #SBATCH -J RNA-seq_pipeline
-#SBATCH -N 8
+#SBATCH -N 1
 #SBATCH --ntasks-per-node=24
-#SBATCH --time=0-48:00:00
+#SBATCH --time=0-10:00:00
 #SBATCH --qos=normal
  
 echo "== Starting run at $(date)"
@@ -11,8 +11,7 @@ echo "== Node list: ${SLURM_NODELIST}"
 echo "== Submit dir. : ${SLURM_SUBMIT_DIR}"
 # Your more useful application can be started below!
 
-mkdir -p Result
+mkdir output
 
 conda activate RNAseq
-# Modify the paths accordingly
-python3 -u /mnt/efs/home/zds0975/pipeline_test/voof/RNAseq-var/pipeline_run.py /mnt/efs/home/zds0975/0317 /mnt/efs/home/zds0975/0317/combined_star_dir/ /mnt/efs/home/zds0975/0317/ref_star_dir/ /mnt/efs/home/zds0975/0317/goi_star_dir/ /mnt/efs/home/zds0975/0317/goi/C2396-1_BCMA_LTR.fa
+python3 run_pipeline.py --input_dir /path_to_your_input_folder
