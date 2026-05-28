@@ -6,6 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
+# Ignoring large unix files
+Genome
+SA
+SAindex
+
 # Distribution / packaging
 .Python
 build/

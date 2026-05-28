@@ -1,0 +1,26 @@
+#!/bin/bash -l
+#SBATCH -J Star_plasmid
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=24
+#SBATCH --time=0-10:00:00
+#SBATCH --qos=normal
+ 
+echo "== Starting run at $(date)"
+echo "== Job ID: ${SLURM_JOBID}"
+echo "== Node list: ${SLURM_NODELIST}"
+echo "== Submit dir. : ${SLURM_SUBMIT_DIR}"
+# Your more useful application can be started below!
+
+
+conda activate unmap_analysis
+# Specify the directory where your .fa files are stored
+data_dir="/path/to/your/data/directory"
+
+# Specify the directory where you want the STAR index to be stored
+genome_dir="/path/to/your/genome/directory"
+
+# Concatenate all .fa files into plasmid.fa
+cat ${data_dir}/*.fa > ${data_dir}/plasmid.fa
+
+# Run STAR to create the genome index
+STAR --runMode genomeGenerate --genomeDir ${genome_dir} --genomeFastaFiles ${data_dir}/plasmid.fa --runThreadN NumberOfThreads

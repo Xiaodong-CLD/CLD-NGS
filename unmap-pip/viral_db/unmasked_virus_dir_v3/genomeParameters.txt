@@ -1,0 +1,19 @@
+### /insight/app/star/v2.7.5a/bin/Linux_x86_64/STAR   --runMode genomeGenerate   --runThreadN 24   --genomeDir unmasked_virus_dir_v3   --genomeFastaFiles virus_unmasked_no_retro.fa   
+### GstrandBit 32
+versionGenome	2.7.4a
+genomeType	Full
+genomeFastaFiles	virus_unmasked_no_retro.fa 
+genomeSAindexNbases	14
+genomeChrBinNbits	18
+genomeSAsparseD	1
+genomeTransformType	None
+genomeTransformVCF	-
+sjdbOverhang	0
+sjdbFileChrStartEnd	- 
+sjdbGTFfile	-
+sjdbGTFchrPrefix	-
+sjdbGTFfeatureExon	exon
+sjdbGTFtagExonParentTranscript	transcript_id
+sjdbGTFtagExonParentGene	gene_id
+sjdbInsertSave	Basic
+genomeFileSizes	498073600 265356163
