@@ -33,33 +33,54 @@ def read_consensus_file(consensus_file_path):
     return consensus_rows
 
 
+# def plot_graphs(consensus_rows, cell_line_id, plotly_output_dir_path):
+#     '''
+#     For our graphs we will have two y-axes.
+#     The first y-axis has the number of reads that supports the nucleotide suggested by the reference.
+#     The second y-axis has the number of reads that do not support the nucleotide suggested by the reference, which means these reads support a variant nucleotide at this position.
+#     '''
+#     x_axis = [i[0] for i in consensus_rows]
+#     y_axis_1 = [i[1] for i in consensus_rows]
+#     y_axis_2 = [i[2] for i in consensus_rows]
+
+#     try:
+#         import plotly
+#         import plotly.graph_objects as go
+#     except ImportError:
+#         print("[Takeda Pipeline Message] Plotly [A python package] is not installed. Please install it using: conda install -c plotly plotly ")
+#         return
+
+#     #Plot the graph.
+#     fig = go.Figure()
+#     fig.add_trace(go.Scatter(x = x_axis, y = y_axis_1, mode = 'lines', name = 'Reference'))
+#     fig.add_trace(go.Scatter(x = x_axis, y = y_axis_2, mode = 'lines', name = 'Variant'))
+#     fig.update_layout(title="Coverage for Reference & Variant Nucleotides for " + cell_line_id, xaxis_title = "Position", yaxis_title = "Number of Reads")
+
+#     #Save the image.
+#     image_path = os.path.join(plotly_output_dir_path, "coverage_plot.jpeg")
+#     fig.write_image(image_path)
+
+#     return True
+
 def plot_graphs(consensus_rows, cell_line_id, plotly_output_dir_path):
-    '''
-    For our graphs we will have two y-axes.
-    The first y-axis has the number of reads that supports the nucleotide suggested by the reference.
-    The second y-axis has the number of reads that do not support the nucleotide suggested by the reference, which means these reads support a variant nucleotide at this position.
-    '''
-    x_axis = [i[0] for i in consensus_rows]
-    y_axis_1 = [i[1] for i in consensus_rows]
-    y_axis_2 = [i[2] for i in consensus_rows]
+    import matplotlib
+    matplotlib.use("Agg")               # no display needed
+    import matplotlib.pyplot as plt
 
-    try:
-        import plotly
-        import plotly.graph_objects as go
-    except ImportError:
-        print("[Takeda Pipeline Message] Plotly [A python package] is not installed. Please install it using: conda install -c plotly plotly ")
-        return
+    x = [i[0] for i in consensus_rows]
+    y_ref = [i[1] for i in consensus_rows]
+    y_var = [i[2] for i in consensus_rows]
 
-    #Plot the graph.
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x = x_axis, y = y_axis_1, mode = 'lines', name = 'Reference'))
-    fig.add_trace(go.Scatter(x = x_axis, y = y_axis_2, mode = 'lines', name = 'Variant'))
-    fig.update_layout(title="Coverage for Reference & Variant Nucleotides for " + cell_line_id, xaxis_title = "Position", yaxis_title = "Number of Reads")
-
-    #Save the image.
-    image_path = os.path.join(plotly_output_dir_path, "coverage_plot.jpeg")
-    fig.write_image(image_path)
-
+    fig, ax = plt.subplots(figsize=(12, 4))
+    ax.plot(x, y_ref, label="Reference", linewidth=1)
+    ax.plot(x, y_var, label="Variant",   linewidth=1, color="crimson")
+    ax.set_xlabel("Position")
+    ax.set_ylabel("Number of Reads")
+    ax.set_title(f"Coverage for Reference & Variant Nucleotides — {cell_line_id}")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(os.path.join(plotly_output_dir_path, "coverage_plot.png"), dpi=150)
+    plt.close(fig)
     return True
 
 

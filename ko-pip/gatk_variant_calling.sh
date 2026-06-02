@@ -12,17 +12,17 @@ mkdir -p $OUTPUT_DIR
 # Adding read group using Picard
 OUTPUT_WITH_RG="$OUTPUT_DIR/output_with_RG.bam"
 picard AddOrReplaceReadGroups \
-      I=$SORTED_BAM_PATH \
-      O=$OUTPUT_WITH_RG \
-      RGID=4 \
-      RGLB=lib1 \
-      RGPL=illumina \
-      RGPU=unit1 \
-      RGSM=20
+      -I $SORTED_BAM_PATH \
+      -O $OUTPUT_WITH_RG \
+      -RGID 4 \
+      -RGLB "lib1" \
+      -RGPL "illumina" \
+      -RGPU "unit1" \
+      -RGSM "20" # read group sample name
 
 SORTED_BAM_WITH_RG="$OUTPUT_DIR/sorted_output_with_RG.bam"
-samtools sort -f $OUTPUT_WITH_RG $SORTED_BAM_WITH_RG
-samtools index $SORTED_BAM_WITH_RG
+samtools sort -@ 16 $OUTPUT_WITH_RG -o $SORTED_BAM_WITH_RG
+samtools index -@ 16 $SORTED_BAM_WITH_RG
 
 # Update the SORTED_BAM_PATH variable to point to the BAM with added read group
 SORTED_BAM_PATH=$SORTED_BAM_WITH_RG

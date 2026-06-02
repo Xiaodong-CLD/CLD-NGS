@@ -160,7 +160,7 @@ if clone_for_every_sample:
     for k,v in by_sample_pos_cons.items():
         by_clone_by_pos_cons[v['CloneID']][k[1:]].append(k[0])  # k[1:] corresponds to ('Position', 'Cons')
 
-    with open(f"{args.input_dir}/Results/snp.txt", 'w') as out_f:
+    with open(f"{args.output_dir}/Results/snp.txt", 'w') as out_f:
         for clone_id,sample_ids in clone_samples.items():
             clone_output_df = pd.DataFrame()
             sample_l = clone_samples[clone_id]
@@ -183,7 +183,7 @@ if clone_for_every_sample:
             else:
                 out_f.write(f"{clone_output_df.to_string(index=False)}\n\n")
 else:
-    with open(f"{args.input_dir}/Results/snp.txt", 'w') as out_f:
+    with open(f"{args.outputs_dir}/Results/snp.txt", 'w') as out_f:
         for sample_id in d:
             out_f.write(f"SampleID: {sample_id}\n")
             sample_df = snp_combined_orig.loc[snp_combined_orig['SampleID'] == sample_id] 
