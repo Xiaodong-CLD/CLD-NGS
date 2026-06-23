@@ -1,3 +1,0 @@
-delly call -g /mnt/efs/home/zds0975/assembly/0817/reference/Reference_PM113+116.fa -o delly.bcf 0817-CHOZN-Lib-07_S7.sorted.bam
-bcftools mpileup -Ou -f /mnt/efs/home/zds0975/assembly/0817/reference/Reference_PM113+116.fa 0817-CHOZN-Lib-07_S7.sorted.bam | bcftools call -mv -Oz -o variants.vcf.gz
-bcftools index variants.vcf.gz
