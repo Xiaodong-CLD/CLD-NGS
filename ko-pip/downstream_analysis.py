@@ -1,167 +1,225 @@
-import subprocess
+"""Per-sample downstream analysis: variant calling + indel/softclip outputs.
+
+Flow (top-to-bottom):
+
+    GATK    ──────► Results/<sample>/indel/gatk_variants.vcf.gz   (indel caller)
+                    Results/<sample>/indel/gatk_variant.tsv       (per-variant read counts)
+    VarScan ──────► Results/<sample>/snv/                         (SNP + consensus VCFs)
+                 └► Results/<sample>/indel/                       (micro-indel VCF)
+
+    Uninformative composition report (only when GATK called a variant):
+        isolate_uninformative_reads   -> Results/<sample>/uninformative_analysis/igv/
+        compute_uninformative_summary -> Results/<sample>/uninformative_analysis/
+
+    Breakpoint analysis (always, on the full BAM):
+        softclip_analysis           -> Results/<sample>/breakpoint_analysis/
+                                       (soft-clip clusters + plasmid BLAST flags)
+
+    Unified indel merging (GATK + VarScan2):
+        merge_indel_callers         -> Results/<sample>/indel/merged_indel.tsv
+
+    Plots:
+        plot_coverage_plots_manager -> Results/<sample>/plots/coverage_plot.png
+        build_softclip_profile      -> Results/<sample>/plots/softclip_profile.png
+
+    The VarScan SNP report (varscan_snp_report) is built from `pipeline.py`
+    and written to Results/<sample>/snv/varscan_snp_report.tsv.
+"""
+
+import glob
 import os
-from varscan_wrapper import varscan_runner
-from plot_coverage_plots import plot_coverage_plots_manager
-from consensus import generate_consensus
-from ko_identification_delly import identify_ko_delly
-from ko_identification_gatk import identify_ko_gatk
-from non_knockout import extract_non_knockout_intervals
-from reads_count_delly import count_reads_delly
-from reads_count_gatk import count_reads_gatk
 import pathlib
+import subprocess
 
-def downstream_analysis(processed_fastq_file_1_path,processed_fastq_file_2_path,reference_path,sorted_bam_file_path, mpileup_file_path,depth_file_path,output_dir):
+import pysam
 
-    current_dir = pathlib.Path(__file__).parent.resolve()
-###################################################################################################################################       
-    delly_folder = os.path.join(output_dir,'delly')
-    # Run variant calling and deletion finding
-    vd_folder = delly_folder
-    if os.path.exists(vd_folder):
-        print(f"[Takeda Pipeline Message] The directory {vd_folder} already exists.")
-    else:
-        print(f"[Takeda Pipeline Message] Create output directory: {vd_folder}.")
-        os.makedirs(vd_folder)
-    delly_path = os.path.join(vd_folder,"delly.bcf")
-    variants_path = os.path.join(vd_folder,"variants.vcf.gz")
-    if os.path.exists(delly_path) and os.path.exists(variants_path):
-        print(f"[Takeda Pipeline Message] The variants and deletion calling already performed.")
-    else:
-        try:
-            script_path = os.path.join(current_dir, 'variant_deletion_calling.sh')
-            subprocess.check_call([script_path,reference_path,sorted_bam_file_path,vd_folder])
-            print("[Takeda Pipeline Message] The variants and deletion calling executed successfully.")
-        except subprocess.CalledProcessError:
-            print("[Takeda Pipeline Message] The variants and deletion calling failed") 
-  
-# ******************************************************************************************** 
-    delly_found_del = True
-    if os.path.exists(delly_path):
-        analysis_output = os.path.join(output_dir, 'analysis')
-        analysis_output = os.path.join(output_dir, 'delly')
-        if os.path.exists(analysis_output):
-            print(f"[Takeda Pipeline Message] The directory {analysis_output} already exists.")
-        else:
-            print(f"[Takeda Pipeline Message] Create output directory: {analysis_output}.")
-            os.makedirs(analysis_output)
-    
-        # Write the knock-out position file
-        knockout_file = os.path.join(analysis_output,"knockout_pos.txt")
-        if os.path.exists(knockout_file):
-            print(f"[Takeda Pipeline Message] The file {knockout_file} already exists. Skipping generating knockout position file.")
-        else:
-            print(f"[Takeda Pipeline Message] Generating the file for knockout position, output file is: {knockout_file}.")
-            identify_ko_delly(delly_path,knockout_file)
-        # Write the non-knockout file
-        non_knockout_file = os.path.join(analysis_output,"non_knockout_pos.txt")
-        if os.path.exists(non_knockout_file):
-            print(f"[Takeda Pipeline Message] The file {non_knockout_file} already exists. Skipping generating non_knockout position file.")
-        else:
-            print(f"[Takeda Pipeline Message] Generating the file for non_knockout position, output file is: {non_knockout_file}.")
-            extract_non_knockout_intervals(reference_path, knockout_file, non_knockout_file) 
-            
-        # Write the reads count file
-        reads_count_file = os.path.join(analysis_output,"reads_count.txt")
-        if os.path.exists(reads_count_file):
-            print(f"[Takeda Pipeline Message] The file {reads_count_file} already exists. Skipping generating reads count file.")
-        else:
-            print(f"[Takeda Pipeline Message] Generating the reads count file, output file is: {reads_count_file}.")
-            count_reads_delly(sorted_bam_file_path, delly_path, reads_count_file)
-        
-        # Generate consensus reads
-        consensus_path = os.path.join(analysis_output,'consensus.fasta')
-        
-        if os.path.exists(consensus_path):
-            print(f"[Takeda Pipeline Message] The file {consensus_path} already exists.")
-        else:
-            print(f"[Takeda Pipeline Message] Create file: {consensus_path}.")
-            generate_consensus(reference_path,knockout_file, consensus_path)
-    else:
-        print(f"[Takeda Pipeline Message] Delly does not found variants check gatk results.")
-        result_txt = os.path.join(delly_folder, 'delly_not_found_ko.txt')
-        with open(result_txt,'w') as f:
-            f.write("Delly does not found variants.")
-        delly_found_del = False
-            
+from gatk_wrapper import run_gatk
+from plot_coverage_plots import plot_coverage_plots_manager
+from varscan_wrapper import varscan_runner
 
-# ******************************************************************************************** 
-    # GATK Variant Calling
-    gatk_folder = os.path.join(output_dir, 'gatk')
-    gatk_vcf_path = os.path.join(gatk_folder, "gatk_variants.vcf.gz")
+from merge_indel_callers import merge_indel_callers
+from softclip_profile import build_softclip_profile
+from isolate_uninformative_reads import main as isolate_uninformative_reads
+from compute_uninformative_summary import main as compute_uninformative_summary
+from softclip_analysis import main as softclip_analysis
+
+
+def _collect_blast_subjects(blast_ref_dir):
+    """Return sorted plasmid FASTA paths under blast_ref_dir (empty if None/missing)."""
+    if not blast_ref_dir or not os.path.isdir(blast_ref_dir):
+        return []
+    subjects = []
+    for ext in ('*.fa', '*.fasta', '*.fna'):
+        subjects += glob.glob(os.path.join(blast_ref_dir, ext))
+    return sorted(subjects)
+
+
+def downstream_analysis(
+    reference_path,
+    sorted_bam_file_path,
+    mpileup_file_path,
+    output_dir,
+    target_chrom=None,
+    target_start=None,
+    target_end=None,
+    sample_id=None,
+    run_output_dir=None,
+    blast_ref_dir=None,
+):
+    indel_folder = os.path.join(output_dir, 'indel')
+    pathlib.Path(indel_folder).mkdir(parents=True, exist_ok=True)
+
+    # Plasmid FASTAs to BLAST soft clips against (construct-match detection).
+    blast_subjects = _collect_blast_subjects(blast_ref_dir)
+
+    # Single canonical sample id reused by every downstream stage so the
+    # rows in every output agree.
+    _sid = sample_id or pathlib.Path(sorted_bam_file_path).stem.replace('.sorted', '')
+
+    # Resolve the chrom we operate on; defaults to the first reference contig.
+    _chrom, _, _ = _resolve_target_window(
+        reference_path, target_chrom, target_start, target_end,
+    )
+
+    # ------------------------------------------------------------------
+    # GATK -> Results/<sample>/indel/gatk_variants.vcf.gz
+    # ------------------------------------------------------------------
+    gatk_vcf_path = os.path.join(indel_folder, 'gatk_variants.vcf.gz')
     if not os.path.exists(gatk_vcf_path):
         try:
-            script_path_gatk = os.path.join(current_dir, 'gatk_variant_calling.sh')
-            subprocess.check_call([script_path_gatk, reference_path, sorted_bam_file_path, gatk_folder])
-            print("[Takeda Pipeline Message] GATK variant calling executed successfully.")
+            run_gatk(reference_path, sorted_bam_file_path, indel_folder)
+            print('[Takeda Pipeline Message] GATK variant calling executed successfully.')
         except subprocess.CalledProcessError:
-            print("[Takeda Pipeline Message] GATK variant calling failed")
-    if os.path.exists(gatk_vcf_path):
-        analysis_output = os.path.join(output_dir, 'analysis')
-        analysis_output = os.path.join(output_dir, 'gatk')
-        if os.path.exists(analysis_output):
-            print(f"[Takeda Pipeline Message] The directory {analysis_output} already exists.")
-        else:
-            print(f"[Takeda Pipeline Message] Create output directory: {analysis_output}.")
-            os.makedirs(analysis_output)
-    
-        # Write the knock-out position file
-        knockout_file = os.path.join(analysis_output,"knockout_pos.txt")
-        if os.path.exists(knockout_file):
-            print(f"[Takeda Pipeline Message] The file {knockout_file} already exists. Skipping generating knockout position file.")
-        else:
-            print(f"[Takeda Pipeline Message] Generating the file for knockout position, output file is: {knockout_file}.")
-            identify_ko_gatk(gatk_vcf_path,knockout_file)
-        # Write the non-knockout file
-        non_knockout_file = os.path.join(analysis_output,"non_knockout_pos.txt")
-        if os.path.exists(non_knockout_file):
-            print(f"[Takeda Pipeline Message] The file {non_knockout_file} already exists. Skipping generating non_knockout position file.")
-        else:
-            print(f"[Takeda Pipeline Message] Generating the file for non_knockout position, output file is: {non_knockout_file}.")
-            extract_non_knockout_intervals(reference_path, knockout_file, non_knockout_file) 
-            
-        # Write the reads count file
-        reads_count_file = os.path.join(analysis_output,"reads_count.txt")
-        if os.path.exists(reads_count_file):
-            print(f"[Takeda Pipeline Message] The file {reads_count_file} already exists. Skipping generating reads count file.")
-        else:
-            print(f"[Takeda Pipeline Message] Generating the reads count file, output file is: {reads_count_file}.")
-            count_reads_gatk(sorted_bam_file_path, gatk_vcf_path, reads_count_file)
-        
-        # Generate consensus reads
-        consensus_path = os.path.join(analysis_output,'consensus.fasta')
-        
-        if os.path.exists(consensus_path):
-            print(f"[Takeda Pipeline Message] The file {consensus_path} already exists.")
-        else:
-            print(f"[Takeda Pipeline Message] Create file: {consensus_path}.")
-            generate_consensus(reference_path, knockout_file, consensus_path)        
+            print('[Takeda Pipeline Message] GATK variant calling failed.')
 
+    gatk_found = os.path.exists(gatk_vcf_path)
+    if not gatk_found:
+        print('[Takeda Pipeline Message] GATK did not find variants; try analyze manually.')
 
-    else:
-        result_txt = os.path.join(gatk_folder, 'gatk_not_found_ko.txt')
-        with open(result_txt,'w') as f:
-            f.write("GATK does not found variants.")
-        if delly_found_del == False:
-            print("[Takeda Pipeline Message] Both Delly and GATK not found deletion, try analyze manually.")
-            analysis_output = os.path.join(output_dir, 'analysis')
-            result_txt = os.path.join(analysis_output, 'not_fount_ko.txt')
-            with open(result_txt,'w') as f:
-                f.write("Both Delly and GATK not found deletion, try analyze manually.")
-        
-    
-        
-#####################################################################################################################################
+    # ------------------------------------------------------------------
+    # Uninformative composition report -- ONLY when GATK called a variant.
+    # Isolates the reads GATK ignored at its called sites, summarizes their
+    # composition, and writes a BAM + index for IGV. Descriptive only; it
+    # does not feed any verdict. Skipped entirely on a GATK no-call (there
+    # are no called sites to define "ignored" reads), so the
+    # uninformative_analysis/ folder exists iff GATK found a variant.
+    # ------------------------------------------------------------------
+    if gatk_found:
+        try:
+            uninf_folder = os.path.join(output_dir, 'uninformative_analysis')
+            igv_folder = os.path.join(uninf_folder, 'igv')
+            pathlib.Path(igv_folder).mkdir(parents=True, exist_ok=True)
 
-   
-    # Variant Calling
-    output_consensus_vcf_file_path = varscan_runner(mpileup_file_path)
-    
-    # Generate Plot
+            isolate_uninformative_reads([
+                '-b', str(sorted_bam_file_path),
+                '-v', str(gatk_vcf_path),
+                '-r', str(reference_path),
+                '-o', str(igv_folder),
+                '--sample', _sid,
+            ])
+
+            uninf_bam = os.path.join(igv_folder, f'{_sid}.sorted.bam')
+
+            compute_uninformative_summary([
+                '-b', str(uninf_bam),
+                '-o', str(os.path.join(uninf_folder, 'uninformative_summary.tsv')),
+                '--sample', _sid,
+                '--long-softclip-bp', '20',
+                '--high-mismatch-rate', '0.05',
+            ])
+            print(f'[Takeda Pipeline Message] Uninformative composition report: {uninf_folder}')
+        except Exception as e:
+            print(f'[Takeda Pipeline Message] Uninformative composition report failed: {e}')
+
+    # ------------------------------------------------------------------
+    # Breakpoint analysis -- ALWAYS run on the full sorted BAM, independent
+    # of GATK. Clusters soft-clip junctions and BLASTs the cluster
+    # representatives against the plasmid references (construct-match /
+    # insert-like flag). Large insertions and construct integrations leave
+    # soft-clip junctions here even when no caller emits an indel.
+    # ------------------------------------------------------------------
+    try:
+        bp_folder = os.path.join(output_dir, 'breakpoint_analysis')
+        tmp_root = run_output_dir or os.path.dirname(output_dir)
+        blast_db_dir = os.path.join(tmp_root, 'tmp', 'breakpoint_analysis_blast_db')
+        pathlib.Path(bp_folder).mkdir(parents=True, exist_ok=True)
+
+        softclip_args = [
+            '-b', str(sorted_bam_file_path),
+            '-o', str(bp_folder),
+            '--min-len', '10',
+            '--top', '20',
+            '--blast-db-dir', str(blast_db_dir),
+            '--threads', '4',
+            '--blast-subject', ','.join(blast_subjects),
+        ]
+        softclip_analysis(softclip_args)
+
+        print(f'[Takeda Pipeline Message] Breakpoint analysis completed: {bp_folder}')
+    except Exception as e:
+        print(f'[Takeda Pipeline Message] Breakpoint analysis failed: {e}')
+
+    # ------------------------------------------------------------------
+    # Call VarScan SNP + indel + consensus VCFs for this sample.
+    # ------------------------------------------------------------------
+    output_consensus_vcf_file_path = varscan_runner(mpileup_file_path, output_dir=output_dir)
+
+    # ------------------------------------------------------------------
+    # Merge GATK + VarScan2 indels -> Results/<sample>/indel/merged_indel.tsv
+    # ------------------------------------------------------------------
+    _varscan_matches = glob.glob(os.path.join(indel_folder, '*.indel.vcf'))
+    varscan_indel_for_merger = _varscan_matches[0] if _varscan_matches else None
+
+    try:
+        merged_path = merge_indel_callers(
+            gatk_vcf=gatk_vcf_path if gatk_found else None,
+            varscan_indel_vcf=varscan_indel_for_merger,
+            reference_path=reference_path,
+            chrom=_chrom,
+            sample_id=_sid,
+            output_dir=indel_folder,
+        )
+        print(f'[Takeda Pipeline Message] Merged indels: {merged_path}')
+    except Exception as e:
+        print(f'[Takeda Pipeline Message] Indel merger failed: {e}')
+
+    # ------------------------------------------------------------------
+    # Plots -> Results/<sample>/plots/
+    # ------------------------------------------------------------------
+    plots_dir = os.path.join(output_dir, 'plots')
+    pathlib.Path(plots_dir).mkdir(parents=True, exist_ok=True)
+
+    # Soft-clip profile (review-only signal; do NOT treat peaks as confirmed indels).
+    try:
+        build_softclip_profile(
+            bam_path=sorted_bam_file_path,
+            output_dir=plots_dir,
+            chrom=_chrom,
+            sample_id=_sid,
+        )
+    except Exception as e:
+        print(f'[Takeda Pipeline Message] softclip_profile failed: {e}')
+
+    # Coverage plot from the VarScan consensus VCF.
     plot_coverage_plots_manager(output_consensus_vcf_file_path)
-    
-    return non_knockout_file
-    
 
 
-if __name__ == "__main__":
+
+
+
+def _resolve_target_window(reference_path, target_chrom, target_start, target_end):
+    """Resolve the target window. If chrom is not provided, default to the
+    first contig in the reference, full length (1-based inclusive)."""
+    if target_chrom and target_start and target_end:
+        return target_chrom, int(target_start), int(target_end)
+    fa = pysam.FastaFile(reference_path)
+    try:
+        chrom = target_chrom or fa.references[0]
+        length = fa.get_reference_length(chrom)
+    finally:
+        fa.close()
+    return chrom, int(target_start or 1), int(target_end or length)
+
+
+if __name__ == '__main__':
     pass

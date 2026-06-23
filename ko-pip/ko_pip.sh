@@ -1,12 +1,15 @@
 #!/bin/bash
 set -euo pipefail
 
+CONDA_ENV="ko_pip"
+
 usage() {
-    echo "Usage: $0 -i <input_dir> -o <output_dir> -r <reference_fa> [-s <session_name>]"
+    echo "Usage: $0 -i <input_dir> -o <output_dir> -r <reference_fa> -b <blast_ref_dir> [-s <session_name>]"
     echo
     echo "  -i  Input directory (must contain sample_xlsx/ and Fastq/)"
     echo "  -o  Output directory"
     echo "  -r  Reference fasta"
+    echo "  -b  Directory of plasmid FASTA files (*.fa/*.fasta) to BLAST breakpoint clusters against (required)"
     echo "  -s  tmux session name (default: derived from output dir basename)"
     exit 1
 }
@@ -15,18 +18,20 @@ INPUT=""
 OUTPUT=""
 REFERENCE=""
 SESSION=""
+BLAST_REF=""
 
-while getopts ":i:o:r:s:h" opt; do
+while getopts ":i:o:r:b:s:h" opt; do
     case "$opt" in
         i) INPUT="$OPTARG" ;;
         o) OUTPUT="$OPTARG" ;;
         r) REFERENCE="$OPTARG" ;;
+        b) BLAST_REF="$OPTARG" ;;
         s) SESSION="$OPTARG" ;;
         h|*) usage ;;
     esac
 done
 
-if [[ -z "$INPUT" || -z "$OUTPUT" || -z "$REFERENCE" ]]; then
+if [[ -z "$INPUT" || -z "$OUTPUT" || -z "$REFERENCE" || -z "$BLAST_REF" ]]; then
     usage
 fi
 
@@ -37,17 +42,34 @@ fi
 mkdir -p logs "$OUTPUT"
 LOG="logs/${SESSION}.log"
 
+# Locate conda so `conda activate` works inside the non-interactive tmux shell
+CONDA_BASE="$(conda info --base 2>/dev/null)"
+if [[ -z "$CONDA_BASE" || ! -f "$CONDA_BASE/etc/profile.d/conda.sh" ]]; then
+    echo "Error: could not locate conda installation (is conda on PATH?)" >&2
+    exit 1
+fi
+
+if ! conda env list | awk '{print $1}' | grep -qx "$CONDA_ENV"; then
+    echo "Error: conda env '$CONDA_ENV' not found. Create it first." >&2
+    exit 1
+fi
+
 echo "Starting tmux session '$SESSION'"
 echo "  input:     $INPUT"
 echo "  output:    $OUTPUT"
 echo "  reference: $REFERENCE"
+echo "  blast_ref: $BLAST_REF"
+echo "  env:       $CONDA_ENV"
 echo "  log:       $LOG"
 
 tmux new-session -d -s "$SESSION" \
-    "python3 -u pipeline_combined.py \
+    "source '$CONDA_BASE/etc/profile.d/conda.sh' && \
+     conda activate '$CONDA_ENV' && \
+     python3 -u pipeline.py \
         -i '$INPUT' \
         -o '$OUTPUT' \
         -r '$REFERENCE' \
+        --blast_ref '$BLAST_REF' \
         > '$LOG' 2>&1"
 
 echo "Tail the log with: tail -f $LOG"

@@ -34,3 +34,10 @@ __pycache__/
 # Editor / OS
 .vscode/
 .DS_Store
+.github/
+*.md
+
+# specific folders
+archive/*
+expt/*
+test/*
