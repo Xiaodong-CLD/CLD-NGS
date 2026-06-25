@@ -232,3 +232,6 @@ with open(f"{args.input_dir}/Results/indel.txt", 'w') as out_f:
                 out_f.write('No structural variants reported by Pindel\n\n')
             else:
                 out_f.write(f"{sample_df[pindel_display_cols].to_string(index=False)}\n\n")
+
+print(f"[Takeda Pipeline Message] Pipeline complete. Results written to {os.path.join(args.input_dir, 'Results')} "
+      f"(per-sample folders, snp.txt, indel.txt).")
