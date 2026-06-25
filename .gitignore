@@ -208,3 +208,9 @@ ko-pip/.venv/
 ko-pip/.vscode/
 ko-pip/.DS_Store
 ko-pip/**/*.md
+
+# amp-pip-dev
+# runs, tools, pychache
+amp-pip-dev/runs/
+amp-pip-dev/tools/
+amp-pip-dev/**/__pycache__/

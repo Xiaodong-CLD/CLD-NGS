@@ -1,0 +1,22 @@
+name: variant-calling
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  # --- core language ---
+  - python=3.10
+  # --- alignment / variant tools (the upgrade targets) ---
+  - bwa=0.7.19
+  - samtools=1.23.1
+  - fastp=1.3.5
+  - varscan=2.4.6
+  - pindel=0.2.5b9
+  - openjdk=17
+  # --- python libs for reporting ---
+  - pandas
+  - numpy
+  - openpyxl
+  - plotly
+  # --- coverage plot export: keep kaleido 0.x (bundles chromium, no system Chrome) ---
+  - python-kaleido=0.2.1
