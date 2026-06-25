@@ -167,3 +167,44 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 .DS_Store
+
+# Co-pilot agent
+.github/
+
+# Project-specific files: ko-pip
+# data, results, logs, experiments, archive
+ko-pip/data/
+ko-pip/outputs/
+ko-pip/logs/
+ko-pip/test/
+ko-pip/expt/
+ko-pip/archive/
+ko-pip/mount.sh*
+
+# Pipeline byproducts
+ko-pip/**/*.bam
+ko-pip/**/*.bai
+ko-pip/**/*.sam
+ko-pip/**/*.cram
+ko-pip/**/*.crai
+ko-pip/**/*.fastq
+ko-pip/**/*.fastq.gz
+ko-pip/**/*.fq
+ko-pip/**/*.fq.gz
+ko-pip/**/*.vcf
+ko-pip/**/*.vcf.gz
+ko-pip/**/*.vcf.gz.tbi
+ko-pip/**/*.bcf
+ko-pip/**/*.bcf.csi
+ko-pip/**/*.mpileup
+ko-pip/**/*.depth.txt
+ko-pip/**/*.fastp.html
+ko-pip/**/*.fastp.json
+ko-pip/**/*.bnk/
+
+# Python / editor / OS / docs
+ko-pip/**/__pycache__/
+ko-pip/.venv/
+ko-pip/.vscode/
+ko-pip/.DS_Store
+ko-pip/**/*.md
