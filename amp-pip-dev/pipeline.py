@@ -72,7 +72,7 @@ def pipeline_manager():
     call_indels(sorted_bam_file_path, reference_file_path)
 
     #Create Coverage plot.
-    plot_coverage_plots_manager(consensus_file_path)
+    plot_coverage_plots_manager(consensus_file_path, reference_file_path)
 
 
 

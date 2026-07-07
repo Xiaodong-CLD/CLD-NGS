@@ -170,6 +170,7 @@ cython_debug/
 
 # Co-pilot agent
 .github/
+AGENTS.md
 
 # Project-specific files: ko-pip
 # data, results, logs, experiments, archive
@@ -210,7 +211,9 @@ ko-pip/.DS_Store
 ko-pip/**/*.md
 
 # amp-pip-dev
-# runs, tools, pychache
+# runs, tools, experiments, benchmarks, pycache
 amp-pip-dev/runs/
 amp-pip-dev/tools/
+amp-pip-dev/experiments/
+amp-pip-dev/benchmarks/
 amp-pip-dev/**/__pycache__/

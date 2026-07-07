@@ -1,12 +1,14 @@
 # Pipeline Upgrade — June 2026 (technical notes)
 
 Technical record of the conda toolchain upgrade, the new structural-variant report,
-and the validation that confirmed the upgrade is output-neutral. Includes follow-up
-items for future improvement. Audience: developers / maintainers.
+and the bug fixes / tuning that followed. Each change carries its own **Tested** note
+(the env upgrade is validated as output-neutral). Includes follow-up items for future
+improvement. Audience: developers / maintainers.
 
-**Validation dataset:** TLA-0609 (3 samples), full plasmid reference
-`D08_HI_HS_AvB1.fa`. The old and new environments were run on this same dataset and
-reference; the only deliberate variable between them is the tool versions.
+**Dataset:** every experiment and update in this document was developed and validated
+on the **2026-0609_TLA** run (3 samples), full plasmid reference `D08_HI_HS_AvB1.fa`.
+Where old vs new environments are compared, both were run on this same dataset and
+reference, so the only deliberate variable is the tool versions.
 
 ---
 
@@ -14,7 +16,7 @@ reference; the only deliberate variable between them is the tool versions.
 
 ### A. Conda environment toolchain upgrade
 
-New environment `variant-calling` (from [../envs/variant-calling.yml](../envs/variant-calling.yml))
+New environment `variant-calling` (from [envs/variant-calling.yml](envs/variant-calling.yml))
 replaces the previous `variant-calling` environment.
 
 | Tool      | Old (baseline) | New (upgraded) | Reason |
@@ -29,11 +31,14 @@ replaces the previous `variant-calling` environment.
 Reporting libs (pandas, numpy, openpyxl, plotly), `pindel=0.2.5b9`, and  `python-kaleido=0.2.1`
 (chromium-bundled, for coverage-plot export) are unchanged in role.
 
-**Tested:** Yes. Full 3-sample run (`runs/T2_upgrade/`, threads=16) completed with
-no `Traceback`. Compared against `runs/T1_5_threads/` (old env, same reference, same
-thread count), so any difference is attributable to tool versions only.
+**Tested:** Yes — and **output-neutral at the reporting level.** Old-env vs new-env
+on the same reference gave a **byte-identical** `Results/snp.txt`, VarScan `*.snp.vcf`,
+and Pindel `Summary.100.vcf` (all 3 samples). `*.indel.vcf`/`*.consensus.vcf` differ
+only by ±1–2 read counts at a few positions with **no variant gained or lost**; the
+only ≥2% change is the existing `6218 -GGCTCT` deletion shifting 0.03% (e.g. Lib1
+30.85→30.82%), still called in both.
 
-### B. Code: Pindel structural-variant report ([../pipeline_combined.py](../pipeline_combined.py))
+### B. Code: Pindel structural-variant report ([pipeline_combined.py](pipeline_combined.py))
 
 Additive only — the `indel.txt` feature reads existing Pindel output; the tuned
 Pindel invariants (insert size, `-E`, pindel2vcf sweep) are untouched. (The separate
@@ -66,35 +71,42 @@ stability settings only — they do not change which variants are called.
 | `pindel_wrapper.py` | `pindel -T 100` | `-T 16` | **Fix:** `-T 100` oversubscribed a 24-core host (thread thrashing / potential stalls). Output unchanged. |
 | `varscan_wrapper.py` | — | — | No thread flag; unchanged. |
 
-The only result-relevant one is `bwa mem -t`, and only as the sub-threshold
-read-count jitter described in §2.
+The only result-relevant one is `bwa mem -t`, and only as sub-threshold read-count
+jitter: comparing two runs that differ in thread count only (same env and reference),
+BWA-MEM batch boundaries shift with `-t` so per-position read counts move by ±1–2
+while the called variants stay identical.
+
+**Tested:** Yes — the ±1–2 jitter above stays below every reporting threshold; no
+variant gained or lost.
+
+### D. Bug fixes — fastp report paths & coverage-plot span
+
+Correctness fixes found while validating on real MiSeq (`_R1_001.fastq.gz`) naming.
+None change which variants are called.
+
+| Change | File | Detail |
+|--------|------|--------|
+| fastp report path no longer clobbers input | `fastp_wrapper.py` | The old `input.replace(".R1.fastq.gz", ".fastp.html")` **silently no-ops** on `_R1_001.fastq.gz`-style names, so fastp wrote its HTML/JSON report over the raw input FASTQ. Now the FASTQ extension (`.fastq.gz`/`.fq.gz`/`.fastq`/`.fq`) is stripped before appending `.fastp.html`/`.fastp.json`. |
+| Coverage plot spans the full reference | `plot_coverage_plots.py` | The plot was drawn only from positions present in the consensus, so it started partway in and stopped short. New helper `get_reference_length()` reads the reference FASTA; `read_consensus_file()` now pads zero-coverage positions before the first and after the last covered base up to the reference length. |
+| Per-sample coverage-plot filename | `plot_coverage_plots.py` | Output renamed from a fixed `coverage_plot.jpeg` to `<cell_line_id>_coverage_plot.jpeg` so multi-sample runs no longer overwrite one image. |
+| Pass reference through to the plotter | `pipeline.py` | `plot_coverage_plots_manager()` now receives `reference_file_path` so it can compute the reference length for the padding above. |
+
+### E. mpileup depth cap removed — `samtools mpileup -d 0`
+
+`samtools_wrapper.py` now passes an explicit `-d 0` (uncapped max depth) instead
+of relying on the samtools default `-d 8000`. **This deliberately changes output**
+(unlike §C/§D): the 8000 cap discards ~98% of reads on this deep amplicon and
+inflates a handful of borderline positions over the 2% cutoff — i.e. VarScan SNP
+false positives. `-d 0` feeds VarScan the true read set and removes those spurious
+≥2% calls, making the SNP report more stringent.
+
+Scope: correct for this small (~10 kb) ultra-deep amplicon assay; **do not** copy
+`-d 0` to WGS/large-panel pipelines (OOM risk at high-coverage loci). Full
+investigation and per-library numbers: `experiments/2026-06-mpileup-depth-cap/`.
 
 ---
 
-## 2. Validation — output comparison (old env vs new env, same reference)
-
-| Output | Result |
-|--------|--------|
-| `Results/snp.txt` (final SNP report) | **IDENTICAL** |
-| VarScan `*.snp.vcf` (all 3 samples) | **IDENTICAL** |
-| Pindel `Summary.100.vcf` (all 3 samples) | **IDENTICAL** (byte-for-byte) |
-| VarScan `*.indel.vcf` / `*.consensus.vcf` | Differ only by ±1–2 read counts at a few positions; **no variant gained or lost**. |
-
-The only ≥2% change is the existing `6218 -GGCTCT` deletion, whose frequency shifts
-by 0.03% (Lib1 30.85→30.82%, Lib2 35.01→34.98%) from ±2 supporting reads; it stays
-called in both runs. This is sub-threshold read-count jitter, not a variant change.
-
-The same kind of jitter was seen earlier when only the **thread count** was changed
-(T1 vs T1.5, same env and reference): BWA-MEM batch boundaries shift with `-t`, so
-per-position read counts move by ±1–2 while the called variants stay identical. The
-fastp (0.23 → 1.3) and bwa (0.7.17 → 0.7.19) upgrades produce the same harmless
-effect. All such differences fall below every reporting threshold.
-
-**Conclusion:** the upgrade is output-neutral at the reporting level.
-
----
-
-## 3. Future improvements / follow-ups
+## 2. Future improvements / follow-ups
 
 1. **Thread-independent alignment (optional).** BWA-MEM read-count jitter comes from
    batch boundaries shifting with thread count. `bwa mem -K 10000000` makes batching
@@ -104,20 +116,40 @@ effect. All such differences fall below every reporting threshold.
    `Summary.100.vcf` calls (including low-AD ones). If reviewers prefer parity with
    `snp.txt`, add an optional frequency filter — but keep raw AD visible, since
    Pindel GT is unreliable at amplicon depth.
-
+3. **Migrate `pileup2*` → `mpileup2*` (needs an experiment first).** We now generate
+   the `.mpileup` file but still call VarScan's **legacy** `pileup2snp`/`pileup2indel`/
+   `pileup2cns`. Whether to lift to the modern `mpileup2*` callers should be decided by
+   a follow-up experiment (extend `experiments/2026-06-varscan-interface/`), which found
+   the two interfaces are **not** equivalent. **Caution:** the interfaces have different
+   default reporting `--min-var-freq` (pileup2snp 0.01 vs mpileup2snp 0.2) and emit
+   different output formats — any migration must force matched params and update the
+   downstream CONS-format parsers.
+4. **Reorganize the run output structure for transfer/storage.** Large intermediate
+   files (unsorted/sorted `.bam`, `.mpileup`) are never manually inspected but dominate
+   run size and slow user file transfer. Consider a cleaner layout that separates
+   reviewer-facing reports (`snp.txt`, `indel.txt`, coverage plots) from bulky
+   intermediates, so the latter can be pruned or archived without hunting through
+   per-sample folders.
+5. **Tune the hard-coded Pindel insert size (`398`).** `pindel_wrapper.py` hard-codes
+   `398` as the insert-size config. This should be experimented against the value
+   implied by the actual read length / library insert size for the most accurate
+   indel calls, and the chosen value documented.
 ---
 
-## 4. Files touched
+## 3. Files touched
 
 | File | Change | Tested |
 |------|--------|--------|
-| [../envs/variant-calling.yml](../envs/variant-calling.yml) | New env definition (Python 3.10 + upgraded tools) | Yes (env built + full run) |
-| [../pipeline_combined.py](../pipeline_combined.py) | Added Pindel → `indel.txt` report; renamed from `pindel.txt`; updated docstrings | Yes |
-| `bwa_wrapper.py` | `bwa mem -t 6→16`, piped `samtools sort -@ 4→16` | Yes |
-| `samtools_wrapper.py` | `sort`/`index` `-@ 6→16` | Yes |
-| `pindel_wrapper.py` | `-T 100→16` (thread fix); tuned invariants unchanged | Yes |
+| [envs/variant-calling.yml](../envs/variant-calling.yml) | New env definition (Python 3.10 + upgraded tools) | Yes (env built + full run) |
+| [pipeline_combined.py](../pipeline_combined.py) | Added Pindel → `indel.txt` report; renamed from `pindel.txt`; updated docstrings | Yes |
+| [bwa_wrapper.py](../bwa_wrapper.py) | `bwa mem -t 6→16`, piped `samtools sort -@ 4→16` | Yes |
+| [samtools_wrapper.py](../samtools_wrapper.py) | `sort`/`index` `-@ 6→16`; **`mpileup -d 0`** (uncapped, §1.E) | Yes |
+| [pindel_wrapper.py](../pindel_wrapper.py) | `-T 100→16` (thread fix); tuned invariants unchanged | Yes |
+| [fastp_wrapper.py](../fastp_wrapper.py) | Report path no longer clobbers input FASTQ on `_R1_001` names (§1.D) | Yes |
+| [plot_coverage_plots.py](../plot_coverage_plots.py) | Pad coverage to full reference length; per-sample plot filename; new `get_reference_length()` (§1.D) | Yes |
+| [pipeline.py](../pipeline.py) | Pass `reference_file_path` to `plot_coverage_plots_manager()` (§1.D) | Yes |
 
-## 5. Reproduce a run
+## 4. Reproduce a run
 
 ```bash
 cd ngs/amp-pip-dev

@@ -16,8 +16,17 @@ import random
 def fastp_runner(input_fastq_file_1_path, input_fastq_file_2_path):
     trimmed_fastq_file_1_path = input_fastq_file_1_path.replace(".fastq", ".trimmed.fastq")
     trimmed_fastq_file_2_path = input_fastq_file_2_path.replace(".fastq", ".trimmed.fastq")
-    fastp_html_report_path = input_fastq_file_1_path.replace(".R1.fastq.gz", ".fastp.html")
-    fastp_json_report_path = input_fastq_file_1_path.replace(".R1.fastq.gz", ".fastp.json")
+    # Derive report paths from the R1 name with its FASTQ extension stripped, so
+    # the report path can never collide with (and overwrite) the input FASTQ.
+    # A literal ".R1.fastq.gz" replace silently no-ops on "_R1_001.fastq.gz"
+    # names, which made fastp clobber the raw input with its HTML report.
+    report_base = input_fastq_file_1_path
+    for ext in (".fastq.gz", ".fq.gz", ".fastq", ".fq"):
+        if report_base.endswith(ext):
+            report_base = report_base[: -len(ext)]
+            break
+    fastp_html_report_path = report_base + ".fastp.html"
+    fastp_json_report_path = report_base + ".fastp.json"
 
 
     #Check if fastp has already been executed.

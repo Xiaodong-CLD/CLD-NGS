@@ -14,16 +14,46 @@ def create_plotly_output_directory(input_dir):
         return plotly_output_dir_path
 
 
-def read_consensus_file(consensus_file_path):
+def get_reference_length(reference_file_path):
+    '''
+    Return the total sequence length (bp) of the reference FASTA. Used to know
+    how far to pad the coverage with zeros after the last covered position.
+    '''
+    length = 0
+    with open(reference_file_path) as f:
+        for line in f:
+            if not line.startswith('>'):
+                length += len(line.strip())
+    return length
+
+
+def read_consensus_file(consensus_file_path, reference_length=None):
     '''
     We will read the consesnsus file produced by varscan to create a coverage plot with variants.
+
+    Positions with no consensus entry are padded with zero coverage so the plot
+    spans the full reference instead of starting partway in: positions before
+    the first covered position, and -- when ``reference_length`` is given -- the
+    positions after the last covered one up to the reference length.
     '''
     with open(consensus_file_path) as f:
         raw = f.read()
     rows = [i.split('\t') for i in raw.split('\n') if i != '']
     consensus_rows = [[int(i[1]), int(i[14]) + int(i[15]), int(i[16]) + int(i[17])] for i in rows[1:]]
 
-    return consensus_rows
+    if not consensus_rows:
+        return consensus_rows
+
+    consensus_rows.sort(key=lambda r: r[0])
+    first_pos = consensus_rows[0][0]
+    last_pos = consensus_rows[-1][0]
+    end = reference_length if reference_length is not None else last_pos
+
+    padded = [[pos, 0, 0] for pos in range(1, first_pos)]
+    padded += consensus_rows
+    padded += [[pos, 0, 0] for pos in range(last_pos + 1, end + 1)]
+
+    return padded
 
 
 def plot_graphs(consensus_rows, cell_line_id, plotly_output_dir_path):
@@ -50,13 +80,13 @@ def plot_graphs(consensus_rows, cell_line_id, plotly_output_dir_path):
     fig.update_layout(title="Coverage for Reference & Variant Nucleotides for " + cell_line_id, xaxis_title = "Position", yaxis_title = "Number of Reads")
 
     #Save the image.
-    image_path = os.path.join(plotly_output_dir_path, "coverage_plot.jpeg")
+    image_path = os.path.join(plotly_output_dir_path, f"{cell_line_id}_coverage_plot.jpeg")
     fig.write_image(image_path)
 
     return True
 
 
-def plot_coverage_plots_manager(input_dir):
+def plot_coverage_plots_manager(input_dir, reference_file_path=None):
     if input_dir is None:
         #Take in the reference file as arguments.
         parser = argparse.ArgumentParser()
@@ -84,7 +114,11 @@ def plot_coverage_plots_manager(input_dir):
     #Create a output direcotry for plotly.
     plotly_output_dir_path = create_plotly_output_directory(input_dir)
 
-    consensus_rows = read_consensus_file(consensus_file_path)
+    reference_length = None
+    if reference_file_path and os.path.exists(reference_file_path):
+        reference_length = get_reference_length(reference_file_path)
+
+    consensus_rows = read_consensus_file(consensus_file_path, reference_length)
     plot_graphs(consensus_rows, cell_line_id, plotly_output_dir_path)
 
 
