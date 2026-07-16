@@ -180,7 +180,7 @@ ko-pip/logs/
 ko-pip/test/
 ko-pip/expt/
 ko-pip/archive/
-ko-pip/mount.sh*
+ko-pip/tools/*
 
 # Pipeline byproducts
 ko-pip/**/*.bam
