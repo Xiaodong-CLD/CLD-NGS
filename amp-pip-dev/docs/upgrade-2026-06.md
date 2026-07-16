@@ -134,6 +134,19 @@ investigation and per-library numbers: `experiments/2026-06-mpileup-depth-cap/`.
    `398` as the insert-size config. This should be experimented against the value
    implied by the actual read length / library insert size for the most accurate
    indel calls, and the chosen value documented.
+6. **Run `pindel2vcf` once instead of the `-e` sweep.** `pindel_wrapper.py` currently
+   runs `pindel2vcf` five times per SV type (`-e 15/30/50/75/100`) and the pipeline
+   ultimately only reports `Summary.100.vcf` (the `-e 100` output), so the 15/30/50/75
+   VCFs are intermediate files that are written and never used. `-e` is only a post-hoc
+   filter on the alt-allele supporting-read count (verified: the `-e 100` VCF is exactly
+   the `-e 1` VCF with rows whose `AD` alt < 100 dropped), so this can be reduced to a
+   **single `pindel2vcf` call at the chosen threshold** — or one `-e 1` call plus an
+   in-Python `AD` filter if a ladder is ever needed again — eliminating the redundant
+   intermediate VCFs. **Defer until the current Pindel sensitivity simulation
+   (`benchmarks/pindel-indel-sensitivity/`) is finished**, since that study is what
+   should decide the optimal operating threshold to bake in. Note the benchmark also
+   found Pindel's `AD` under-reports true allele fraction at amplicon depth, so a *true*
+   AF filter should divide alt by the samtools/VarScan depth, not by Pindel's `AD`.
 ---
 
 ## 3. Files touched
