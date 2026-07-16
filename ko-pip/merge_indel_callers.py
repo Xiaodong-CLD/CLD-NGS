@@ -43,24 +43,31 @@ from typing import Dict, List, Optional, Tuple
 import pysam
 
 logger = logging.getLogger("merge_indel_callers")
+MIN_TOTAL_INFORMATIVE_FRAC = 0.01  # gate: VarScan depth must be >= this fraction of total mapped reads
 
 MERGED_COLUMNS = [
     "chrom",
-    "pos",
-    "ref",
-    "alt",
+    "start_pos",
+    "end_pos",
+    "seq",
     "type",
     "length",
     "source",
-    "gatk_allele_count",
-    "gatk_allele_frequency",
-    "gatk_alt_depth_sum",
     "gatk_alt_frequency_direct",
-    "gatk_pileup_dp",
-    "gatk_qual",
+    "gatk_sum_ad_frac",
     "varscan2_alt_frequency",
     "varscan2_read_support",
+    "varscan2_sdp",
+    "varscan2_sum_ad_frac",
+    "edge_artifact",
 ]
+
+# An indel whose 1-based start position falls within this many bp of either
+# amplicon terminus is flagged edge_artifact='yes'. These terminal calls (e.g.
+# an INS right at the last base) are alignment/primer-edge noise; the flag is
+# kept in the per-sample merged_indel.tsv but the run-level aggregator drops
+# them from all_indel.tsv.
+EDGE_ARTIFACT_MARGIN_BP = 3
 
 
 def _normalize_vcf(vcf_path: str, reference_path: str, output_path: str) -> None:
@@ -139,7 +146,7 @@ def _fmt_float(value, ndigits: int) -> str:
     """Format a numeric value to fixed precision; empty string if not numeric."""
     if isinstance(value, (int, float)):
         return f"{value:.{ndigits}f}"
-    return ""
+    return "."
 
 
 def _parse_gatk_vcf(vcf_path: str) -> Dict[Tuple[str, int, str, str], Dict]:
@@ -177,9 +184,12 @@ def _parse_gatk_vcf(vcf_path: str) -> Dict[Tuple[str, int, str, str], Dict]:
             alt_depth = ad[1] if len(ad) > 1 else 0
             total_ad = sum(ad) if ad else 0
             alt_freq_direct = (alt_depth / total_ad) if total_ad else 0.0
-            
+            # pct_sum_ad: fraction of raw locus depth (INFO/DP) GATK attributed to
+            # an allele (sum_AD / DP_INFO). This is the GATK keep-gate metric.
+            pct_sum_ad = (total_ad / dp) if dp else 0.0
+
             qual = rec.qual if rec.qual else 0.0
-            
+
             key = (rec.contig, rec.start, ref, alt)  # rec.start is 0-based
             gatk_indels[key] = {
                 "allele_count": ac,
@@ -188,6 +198,8 @@ def _parse_gatk_vcf(vcf_path: str) -> Dict[Tuple[str, int, str, str], Dict]:
                 "alt_frequency_direct": alt_freq_direct,
                 "pileup_dp": dp,
                 "qual": qual,
+                "sum_ad": total_ad,
+                "pct_sum_ad": pct_sum_ad,
             }
         vcf.close()
     except Exception as e:
@@ -220,6 +232,7 @@ def _parse_varscan_vcf(vcf_path: str) -> Dict[Tuple[str, int, str, str], Dict]:
             freq_val = 0.0
             rd = 0
             ad = 0
+            sdp = 0
             if len(rec.samples) > 0:
                 sample = rec.samples[list(rec.samples)[0]]
                 freq = sample.get("FREQ")
@@ -230,11 +243,21 @@ def _parse_varscan_vcf(vcf_path: str) -> Dict[Tuple[str, int, str, str], Dict]:
                 rd = rd_val[0] if isinstance(rd_val, (list, tuple)) and rd_val else (rd_val or 0)
                 ad_val = sample.get("AD")
                 ad = ad_val[0] if isinstance(ad_val, (list, tuple)) and ad_val else (ad_val or 0)
+                sdp_val = sample.get("SDP")
+                sdp = sdp_val[0] if isinstance(sdp_val, (list, tuple)) and sdp_val else (sdp_val or 0)
+
+            # pct_sum_ad: fraction of raw read depth (SDP) attributed to ref+alt
+            # ((AD + RD) / SDP). VarScan mirror of the GATK keep-gate metric.
+            attributed = (ad or 0) + (rd or 0)
+            pct_sum_ad = (attributed / sdp) if sdp else 0.0
 
             key = (rec.contig, rec.start, ref, alt)  # rec.start is 0-based
             varscan_indels[key] = {
                 "alt_frequency": freq_val,
                 "read_support": f"{ad}:{rd}",  # alt:ref
+                "sdp": sdp,
+                "pct_sum_ad": pct_sum_ad,
+                "attributed": attributed,  # ad + rd; used for total-reads gate
             }
         vcf.close()
     except Exception as e:
@@ -252,6 +275,17 @@ def _indel_length(ref: str, alt: str) -> int:
     return abs(len(ref) - len(alt))
 
 
+def _is_edge_artifact(pos_1based: int, ref_len: int, margin: int = EDGE_ARTIFACT_MARGIN_BP) -> bool:
+    """True if a 1-based indel start sits within ``margin`` bp of either end.
+
+    With margin=3 on a 130 bp amplicon this flags positions 1-3 (5' end) and
+    128-130 (3' end). When ref_len is unknown (0) nothing is flagged.
+    """
+    if not ref_len:
+        return False
+    return pos_1based <= margin or pos_1based > ref_len - margin
+
+
 def merge_indel_callers(
     gatk_vcf: Optional[str],
     varscan_indel_vcf: Optional[str],
@@ -259,9 +293,14 @@ def merge_indel_callers(
     chrom: str,
     sample_id: str,
     output_dir: str,
+    total_mapped_reads: Optional[int] = None,
 ) -> str:
     """Merge GATK and VarScan2 indels into unified TSV.
-    
+
+    ``total_mapped_reads`` (mapped reads in the sorted BAM) is recorded only as
+    a ``# total_mapped_reads`` comment banner for the per-run aggregator's
+    per-sample header; it does not affect any row.
+
     Returns path to merged TSV.
     """
     os.makedirs(output_dir, exist_ok=True)
@@ -286,6 +325,14 @@ def merge_indel_callers(
         else:
             varscan_indels = {}
 
+    # Contig lengths for edge-artifact flagging (position near amplicon end).
+    ref_lengths: Dict[str, int] = {}
+    try:
+        with pysam.FastaFile(reference_path) as _fa:
+            ref_lengths = dict(zip(_fa.references, _fa.lengths))
+    except Exception:
+        ref_lengths = {}
+
     # Merge
     all_keys = set(gatk_indels.keys()) | set(varscan_indels.keys())
     
@@ -298,10 +345,18 @@ def merge_indel_callers(
         
         gatk_data = gatk_indels.get(key, {})
         varscan_data = varscan_indels.get(key, {})
-        
+
+        # Drop VarScan evidence where informative depth < 1% of total mapped reads.
+        if varscan_data and total_mapped_reads and \
+                varscan_data.get("attributed", 0) < MIN_TOTAL_INFORMATIVE_FRAC * total_mapped_reads:
+            varscan_data = {}
+
         in_gatk = bool(gatk_data)
         in_varscan = bool(varscan_data)
-        
+
+        if not in_gatk and not in_varscan:
+            continue  # VarScan-only row dropped by the depth gate above
+
         if in_gatk and in_varscan:
             source = "both"
         elif in_gatk:
@@ -309,27 +364,41 @@ def merge_indel_callers(
         else:
             source = "varscan2_only"
         
+        vtype = _indel_type(ref, alt)
+        if vtype == "DEL":
+            start_pos = pos_1based + 1
+            end_pos = pos_1based + len(ref) - 1
+            seq = ref[1:]
+        else:  # INS
+            start_pos = pos_1based
+            end_pos = pos_1based
+            seq = alt[1:]
+
         row = {
             "chrom": chrom_key,
-            "pos": pos_1based,
-            "ref": ref,
-            "alt": alt,
-            "type": _indel_type(ref, alt),
+            "start_pos": start_pos,
+            "end_pos": end_pos,
+            "seq": seq,
+            "type": vtype,
             "length": _indel_length(ref, alt),
             "source": source,
-            "gatk_allele_count": gatk_data.get("allele_count", ""),
-            "gatk_allele_frequency": _fmt_float(gatk_data.get("allele_frequency"), 6),
-            "gatk_alt_depth_sum": gatk_data.get("alt_depth_sum", ""),
             "gatk_alt_frequency_direct": _fmt_float(gatk_data.get("alt_frequency_direct"), 6),
-            "gatk_pileup_dp": gatk_data.get("pileup_dp", ""),
-            "gatk_qual": _fmt_float(gatk_data.get("qual"), 1),
+            "gatk_sum_ad_frac": _fmt_float(gatk_data.get("pct_sum_ad"), 6),
             "varscan2_alt_frequency": _fmt_float(varscan_data.get("alt_frequency"), 6),
-            "varscan2_read_support": varscan_data.get("read_support", ""),
+            "varscan2_read_support": varscan_data.get("read_support", "."),
+            "varscan2_sdp": varscan_data.get("sdp", "."),
+            "varscan2_sum_ad_frac": _fmt_float(varscan_data.get("pct_sum_ad"), 6),
+            "edge_artifact": "yes" if _is_edge_artifact(
+                pos_1based, ref_lengths.get(chrom_key, 0)
+            ) else "no",
         }
         out_rows.append(row)
     
     # Write output
     with open(out_path, "w", newline="") as fh:
+        fh.write(f"# sample: {sample_id}\n")
+        if total_mapped_reads is not None:
+            fh.write(f"# total_mapped_reads: {total_mapped_reads}\n")
         w = csv.DictWriter(fh, fieldnames=MERGED_COLUMNS, delimiter="\t")
         w.writeheader()
         for r in out_rows:

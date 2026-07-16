@@ -3,14 +3,15 @@
 """
 Pipeline for Knockout analysis (KO-pip) of amplicon sequencing data.
 
-This Python script performs genome assembly and downstream analysis given 
-a directory of .fastq files. For each pair of fastq files in 
-the input directory, it creates a directory in the output folder, where 
+This Python script performs genome assembly and downstream analysis given
+a directory of paired-end .fastq files. For each pair of fastq files in
+the input directory, it creates a directory in the output folder, where
 all the output files from the analysis of that pair will be placed.
 
-The user can specify an input directory of .fastq files, an optional output 
-directory, and an optional flag to process single read files. If the output 
-directory is not provided, the current working directory is used. 
+The user specifies an input directory of .fastq files (-i), an optional output
+directory (-o, default: current directory), a reference FASTA (-r), and a
+directory of plasmid FASTAs to BLAST breakpoint clusters against (-br). If the
+output directory is not provided, the current working directory is used.
 
 Original script created by Lilin Huang.
 
@@ -28,6 +29,18 @@ Updated by Cindy Ren on 2026-06-22:
 - Reference FASTA (and any sibling index/.dict files) is copied into
   tmp/reference/ before indexing, so the source reference directory can
   remain read-only.
+
+Per-sample diagnostic intermediates are kept under tmp/<sample>/<module>/ while
+Results/<sample>/ holds only the deliverables:
+- indel/       : only merged_indel.tsv (GATK/VarScan VCFs live in tmp/)
+- consensus/   : only <sample>.consensus.fa (vsearch intermediates + diagnostic
+                 tables live in tmp/)
+- breakpoint_analysis/ : top_clusters.tsv + top_softclip_sequence.fa (full BLAST
+                 hits live in tmp/)
+- snv/         : derived deliverables only (varscan_snp_report.tsv; coverage
+                 plot under plots/). Raw VarScan SNP/consensus VCFs live in
+                 tmp/<sample>/snv/. Amino-acid annotation is archived; the
+                 report's AA columns are left blank.
 """
 import argparse
 import glob
@@ -39,8 +52,10 @@ import subprocess
 from preprocess import data_preprocessing
 from downstream_analysis import downstream_analysis
 from align import assembly
-from varscan_snp_report import build_snp_report, annotate_mpileup2snp_snp
+from varscan_snp_report import build_snp_report
 from aggregate_run_report import aggregate_run_report
+from vsearch_wrapper import vsearch_runner
+from gatk_wrapper import get_mapped_reads_count
 
 def name(string):
     '''
@@ -162,23 +177,48 @@ for sample_idx in d:
     # Perform downstream analysis (persistent results under sample_dir)
         
     downstream_analysis(reference_path, sorted_bam_file_path, mpileup_file_path, sample_dir,
+                        tmp_sample_dir,
                         blast_ref_dir=args.blast_ref)
    
      
      
      
+    # VSEARCH whole-amplicon consensus haplotypes from the trimmed reads.
+    # Persistent deliverable under Results/<sample>/consensus/; vsearch
+    # intermediates and diagnostic tables go to tmp/<sample>/consensus/.
+    consensus_dir = os.path.join(sample_dir, 'consensus')
+    consensus_scratch_dir = os.path.join(tmp_sample_dir, 'consensus')
+    pathlib.Path(consensus_dir).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(consensus_scratch_dir).mkdir(parents=True, exist_ok=True)
+    try:
+        consensus_fa = vsearch_runner(
+            processed_fastq_file_1_path, processed_fastq_file_2_path,
+            reference_path, consensus_dir, consensus_scratch_dir, naming,
+        )
+        if consensus_fa:
+            print(f"[Takeda Pipeline Message] Consensus haplotypes wrote: {consensus_fa}")
+        else:
+            print("[Takeda Pipeline Message] Consensus (vsearch) produced no haplotypes.")
+    except Exception as e:
+        print(f"[Takeda Pipeline Message] Consensus (vsearch_wrapper) failed: {e}")
+
     snp_vcf_folder = os.path.join(sample_dir, 'snv')
-    snp_vcf_path = os.path.join(snp_vcf_folder, f"{naming}.snp.vcf")
+    snp_vcf_tmp_folder = os.path.join(tmp_sample_dir, 'snv')
+    pathlib.Path(snp_vcf_folder).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(snp_vcf_tmp_folder).mkdir(parents=True, exist_ok=True)
 
-    # Amino-acid-annotate the VarScan SNP table.
-    annotate_mpileup2snp_snp(snp_vcf_path, reference_path, snp_vcf_folder)
-
-    # Build the per-sample SNP report next to the VarScan SNV outputs.
+    # NOTE: amino-acid annotation is archived. The current annotator assumes the
+    # reference is in-frame from position 1, which is wrong for a generic
+    # amplicon, so the AA columns were unreliable. A correct future version must
+    # take the CDS start position (and strand) to translate variants. Until
+    # then, the report is built directly from the plain VarScan SNP table and
+    # the amino-acid columns are left blank.
     try:
         snp_report_path = build_snp_report(
-            varscan_dir=snp_vcf_folder,
+            varscan_dir=snp_vcf_tmp_folder,
             sample_id=naming,
             output_dir=snp_vcf_folder,
+            total_reads=get_mapped_reads_count(sorted_bam_file_path),
         )
         print(f"[Takeda Pipeline Message] SNP report wrote: {snp_report_path}")
     except Exception as e:
@@ -191,13 +231,5 @@ results_dir = os.path.join(args.output_dir, 'Results')
 final_report_dir = os.path.join(args.output_dir, 'final_report')
 aggregate_run_report(results_dir, final_report_dir, sample_records)
 
-print(f'[Takeda Pipeline Message] Assembly analysis for knock-out project completes.')
-
-
-
-
-
-
-
-
-
+print(f'[Takeda Pipeline Message] Pipeline complete. {len(sample_records)} sample(s) processed. '
+      f'Per-sample results: {results_dir}/ | Aggregated report: {final_report_dir}/')

@@ -14,6 +14,8 @@ import argparse
 import subprocess
 import os
 
+from pipeline_io import is_nonempty, count_fastq_reads, commit
+
 
 def fastp_runner(input_fastq_file_1_path, input_fastq_file_2_path,
                  output_dir, naming_prefix, ext=".fastq.gz", report_dir=None):
@@ -26,11 +28,24 @@ def fastp_runner(input_fastq_file_1_path, input_fastq_file_2_path,
     fastp_html_report_path = os.path.join(report_dir, f"{naming_prefix}.fastp.html")
     fastp_json_report_path = os.path.join(report_dir, f"{naming_prefix}.fastp.json")
 
-    # Check if fastp has already been executed.
-    if os.path.exists(trimmed_fastq_file_1_path) and os.path.exists(trimmed_fastq_file_2_path):
+    # Check if fastp has already been executed. The JSON report is written last
+    # by fastp and serves as a completion marker; trimmed FASTQs are checked for
+    # non-emptiness (not full gzip integrity) to keep the skip-check fast.
+    if (is_nonempty(fastp_json_report_path)
+            and is_nonempty(trimmed_fastq_file_1_path)
+            and is_nonempty(trimmed_fastq_file_2_path)):
         print("[Takeda Pipeline Message] Read Trimmer: fastp, has already been executed on files {} and {}".format(
             os.path.basename(input_fastq_file_1_path), os.path.basename(input_fastq_file_2_path)))
         return trimmed_fastq_file_1_path, trimmed_fastq_file_2_path
+
+    # Write to temp paths and atomically rename only after validation, so a
+    # killed fastp never leaves a partial file at the canonical output path.
+    tmp_1 = trimmed_fastq_file_1_path + ".tmp"
+    tmp_2 = trimmed_fastq_file_2_path + ".tmp"
+    # Remove any partial leftovers from a previous failed run so we start clean.
+    for p in (trimmed_fastq_file_1_path, trimmed_fastq_file_2_path, tmp_1, tmp_2):
+        if os.path.exists(p):
+            os.remove(p)
 
     try:
         print("[Takeda Pipeline Message] Trimming and Quality checking fastq files: {} and {}".format(
@@ -39,16 +54,31 @@ def fastp_runner(input_fastq_file_1_path, input_fastq_file_2_path,
             "fastp",
             "--in1", input_fastq_file_1_path,
             "--in2", input_fastq_file_2_path,
-            "--out1", trimmed_fastq_file_1_path,
-            "--out2", trimmed_fastq_file_2_path,
+            "--out1", tmp_1,
+            "--out2", tmp_2,
             "-w", "16",
             "-j", fastp_json_report_path,
             "-h", fastp_html_report_path,
         ])
+
+        # Integrity: both outputs must be complete gzip streams. Pair invariant:
+        # paired-mode fastp drops reads as pairs, so the surviving mate counts
+        # must match; a mismatch means a truncated/corrupt output.
+        n1 = count_fastq_reads(tmp_1)
+        n2 = count_fastq_reads(tmp_2)
+        if n1 != n2:
+            raise subprocess.CalledProcessError(1, "fastp",
+                f"R1/R2 read-count mismatch after trimming: {n1} vs {n2}")
+
+        os.replace(tmp_1, trimmed_fastq_file_1_path)
+        os.replace(tmp_2, trimmed_fastq_file_2_path)
         return trimmed_fastq_file_1_path, trimmed_fastq_file_2_path
 
-    except subprocess.CalledProcessError:
-        print("[Takeda Pipeline Message] fastp processing failed.")
+    except (subprocess.CalledProcessError, ValueError, OSError, EOFError) as err:
+        print("[Takeda Pipeline Message] fastp processing failed: {}".format(err))
+        for p in (tmp_1, tmp_2, trimmed_fastq_file_1_path, trimmed_fastq_file_2_path):
+            if os.path.exists(p):
+                os.remove(p)
         return False, False
 
 
@@ -58,14 +88,26 @@ def error_correction(trimmed_fastq_file_1_path, trimmed_fastq_file_2_path):
     corrected_fastq_file_1_path = os.path.splitext(trimmed_fastq_file_1_path)[0] + "_corrected.fastq"
     corrected_fastq_file_2_path = os.path.splitext(trimmed_fastq_file_2_path)[0] + "_corrected.fastq"
 
-    #Check if bfc has already been executed.
-    if os.path.exists(corrected_fastq_file_1_path) and os.path.exists(corrected_fastq_file_2_path):
+    # Check if bfc has already been executed. The corrected files are plain
+    # (uncompressed) FASTQ, so we can only cheaply check non-emptiness here;
+    # completeness is guaranteed instead by the atomic write below (a partial
+    # file never reaches the canonical name).
+    if is_nonempty(corrected_fastq_file_1_path) and is_nonempty(corrected_fastq_file_2_path):
         print("[Takeda Pipeline Message] Read Correction: bfc, has already been executed on files {} and {}".format(trimmed_fastq_file_1_path.split('/')[-1], trimmed_fastq_file_2_path.split('/')[-1]))
         return corrected_fastq_file_1_path, corrected_fastq_file_2_path
+
+    # Write to temp files and atomically rename only on success, so a killed
+    # bfc never leaves a partial file at the canonical output path.
+    tmp_forward = corrected_fastq_file_1_path + ".tmp"
+    tmp_reverse = corrected_fastq_file_2_path + ".tmp"
+    # Remove any partial leftovers from a previous failed run so we start clean.
+    for p in (corrected_fastq_file_1_path, corrected_fastq_file_2_path, tmp_forward, tmp_reverse):
+        if os.path.exists(p):
+            os.remove(p)
     try:
         # BFC commands for forward and reverse reads
-        bfc_cmd_forward = f"bfc {trimmed_fastq_file_1_path} > {corrected_fastq_file_1_path}"
-        bfc_cmd_reverse = f"bfc {trimmed_fastq_file_2_path} > {corrected_fastq_file_2_path}"
+        bfc_cmd_forward = f"bfc {trimmed_fastq_file_1_path} > {tmp_forward}"
+        bfc_cmd_reverse = f"bfc {trimmed_fastq_file_2_path} > {tmp_reverse}"
 
         # Run BFC on forward reads
         subprocess.run(bfc_cmd_forward, shell=True, check=True)
@@ -73,9 +115,26 @@ def error_correction(trimmed_fastq_file_1_path, trimmed_fastq_file_2_path):
         # Run BFC on reverse reads
         subprocess.run(bfc_cmd_reverse, shell=True, check=True)
 
+        # Integrity + pair invariant: bfc rewrites bases but never drops reads,
+        # so each output must be record-aligned and the two mate counts must
+        # match (and equal the trimmed input counts).
+        n1 = count_fastq_reads(tmp_forward)
+        n2 = count_fastq_reads(tmp_reverse)
+        if n1 != n2:
+            raise subprocess.CalledProcessError(1, "bfc",
+                f"R1/R2 read-count mismatch after correction: {n1} vs {n2}")
+
+        os.replace(tmp_forward, corrected_fastq_file_1_path)
+        os.replace(tmp_reverse, corrected_fastq_file_2_path)
+
         return corrected_fastq_file_1_path, corrected_fastq_file_2_path
-    except subprocess.CalledProcessError:
-        print("[Takeda Pipeline Message] bfc processing failed.")
+    except (subprocess.CalledProcessError, ValueError, OSError, EOFError) as err:
+        print("[Takeda Pipeline Message] bfc processing failed: {}".format(err))
+        for p in (tmp_forward, tmp_reverse,
+                  corrected_fastq_file_1_path, corrected_fastq_file_2_path):
+            if os.path.exists(p):
+                os.remove(p)
+        return False, False
 
 
 def data_preprocessing(input_fastq_file_1_path, input_fastq_file_2_path,

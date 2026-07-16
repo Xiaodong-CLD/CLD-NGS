@@ -5,27 +5,25 @@ This script is a modification of the script located at:
 	https://github.com/oneTakeda/voof/blob/master/amp-pip/pipeline.py
 The above mentioned script on github is written by Tongyu Liu.
 
-The script was modified by Cindy Ren 2026-06-02. Replaced the plotly-based
-`plot_graphs` implementation with a matplotlib version that writes a PNG 
-instead of a JPEG, removing the plotly/kaleido dependency.
+Coverage plot for the KO pipeline. Reads the VarScan ``mpileup2cns`` consensus
+table and draws reference- vs variant-supporting read depth across the whole
+amplicon.
+
+Pinned to plotly 5.x and kaleido 0.2.1 to avoid the plotly 6.x / kaleido 0.3.x
+breakage (chromium not bundled, needs system Chrome).
 '''
 
 import argparse
 import os
-import matplotlib
-matplotlib.use("Agg") # no display needed
-import matplotlib.pyplot as plt
+
 
 def create_plots_output_directory(input_dir):
     '''
     Create a directory called plots to store the coverage plot.
     '''
     plots_output_dir_path = os.path.join(input_dir, "plots")
-    if os.path.exists(plots_output_dir_path):
-        return plots_output_dir_path
-    else:
-        os.mkdir(plots_output_dir_path)
-        return plots_output_dir_path
+    os.makedirs(plots_output_dir_path, exist_ok=True)
+    return plots_output_dir_path
 
 
 def _safe_int(value):
@@ -35,59 +33,109 @@ def _safe_int(value):
         return 0
 
 
-def read_consensus_file(consensus_file_path):
+def get_reference_length(reference_file_path):
     '''
-    Read the VarScan `mpileup2cns` consensus table and return
-    [position, ref_reads, var_reads] per position for the coverage plot.
+    Return the total sequence length (bp) of the reference FASTA. Used to pad
+    the coverage with zeros out to the end of the amplicon after the last
+    covered position.
+    '''
+    length = 0
+    with open(reference_file_path) as f:
+        for line in f:
+            if not line.startswith('>'):
+                length += len(line.strip())
+    return length
 
-    mpileup2cns uses the packed genotype schema: ref/var read counts come from
-    the `Cons:Cov:Reads1:Reads2:Freq:P-value` field at col 4 (Reads1 / Reads2);
-    `-` placeholders at uncovered positions are read as 0.
+
+def read_consensus_file(consensus_file_path, reference_length=None):
+    '''
+    Read the VarScan ``mpileup2cns`` consensus table and return
+    ``[position, ref_reads, var_reads]`` per position for the coverage plot.
+
+    The consensus file is the plain tabular ``mpileup2cns`` output (despite the
+    ``.consensus.vcf`` name): column 4 (``Reads1``) is the reference-supporting
+    read count and column 5 (``Reads2``) is the variant-supporting read count.
+
+    Positions with no consensus entry are padded with zero coverage so the plot
+    spans the full amplicon instead of starting partway in: positions before the
+    first covered position, and -- when ``reference_length`` is given -- the
+    positions after the last covered one up to the reference length.
     '''
     with open(consensus_file_path) as f:
         raw = f.read()
     rows = [i.split('\t') for i in raw.split('\n') if i != '']
     if not rows:
         return []
+
     consensus_rows = []
     for i in rows[1:]:
-        packed = i[4].split(':') if len(i) > 4 else []
-        reads1 = _safe_int(packed[2]) if len(packed) > 2 else 0
-        reads2 = _safe_int(packed[3]) if len(packed) > 3 else 0
-        consensus_rows.append([int(i[1]), reads1, reads2])
+        if len(i) < 6:
+            continue
+        consensus_rows.append([_safe_int(i[1]), _safe_int(i[4]), _safe_int(i[5])])
 
-    return consensus_rows
+    if not consensus_rows:
+        return consensus_rows
+
+    consensus_rows.sort(key=lambda r: r[0])
+    first_pos = consensus_rows[0][0]
+    last_pos = consensus_rows[-1][0]
+    end = reference_length if reference_length is not None else last_pos
+
+    padded = [[pos, 0, 0] for pos in range(1, first_pos)]
+    padded += consensus_rows
+    padded += [[pos, 0, 0] for pos in range(last_pos + 1, end + 1)]
+
+    return padded
 
 
 def plot_graphs(consensus_rows, cell_line_id, plots_output_dir_path):
-    x = [i[0] for i in consensus_rows]
-    y_ref = [i[1] for i in consensus_rows]
-    y_var = [i[2] for i in consensus_rows]
+    '''
+    Two traces per plot:
+      - Reference: reads supporting the reference nucleotide at each position.
+      - Variant:   reads supporting a non-reference (variant) nucleotide.
 
-    fig, ax = plt.subplots(figsize=(12, 4))
-    ax.plot(x, y_ref, label="Reference", linewidth=1)
-    ax.plot(x, y_var, label="Variant",   linewidth=1, color="crimson")
-    ax.set_xlabel("Position")
-    ax.set_ylabel("Number of Reads")
-    ax.set_title(f"Coverage for Reference & Variant Nucleotides — {cell_line_id}")
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(os.path.join(plots_output_dir_path, "coverage_plot.png"), dpi=150)
-    plt.close(fig)
+    Writes a static ``coverage_plot.jpeg`` via kaleido (pinned to 0.2.1, which
+    bundles chromium and needs no system Chrome).
+    '''
+    x_axis = [i[0] for i in consensus_rows]
+    y_axis_ref = [i[1] for i in consensus_rows]
+    y_axis_var = [i[2] for i in consensus_rows]
+
+    try:
+        import plotly.graph_objects as go
+    except ImportError:
+        print("[Takeda Pipeline Message] Plotly [A python package] is not installed. "
+              "Please install it using: conda install -c plotly plotly")
+        return False
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=x_axis, y=y_axis_ref, mode='lines', name='Reference'))
+    fig.add_trace(go.Scatter(x=x_axis, y=y_axis_var, mode='lines', name='Variant'))
+    fig.update_layout(
+        title="Coverage for Reference & Variant Nucleotides for " + cell_line_id,
+        xaxis_title="Position",
+        yaxis_title="Number of Reads",
+    )
+
+    image_path = os.path.join(plots_output_dir_path, "coverage_plot.jpeg")
+    fig.write_image(image_path)
+
     return True
 
 
-def plot_coverage_plots_manager(input_dir):
+def plot_coverage_plots_manager(input_dir, reference_file_path=None):
     if input_dir is None:
         #Take in the reference file as arguments.
         parser = argparse.ArgumentParser()
 
         #Add argument options
-        parser.add_argument("-i", "--input_dir", help="Path of directory which has fastq files (paired).", required = True)
+        parser.add_argument("-i", "--input_dir", help="Path to the VarScan consensus table (*.consensus.vcf).", required=True)
+        parser.add_argument("-r", "--reference", help="Reference FASTA (used to pad coverage to full amplicon length).", default=None)
 
         #Fetch the argument data.
         args = vars(parser.parse_args())
         input_dir = args['input_dir']
+        reference_file_path = args['reference']
 
     #Get the consensus file.
     cell_line_id = input_dir.rstrip('/').split('/')[-1]
@@ -96,7 +144,7 @@ def plot_coverage_plots_manager(input_dir):
 
     consensus_file_path = input_dir
     if not os.path.exists(consensus_file_path):
-        print("[Takeda Pipeline Message] Sorry, the coverage file is not present. Please make sure a file like: snv/HD-N7-F12.consensus.vcf is present.")
+        print("[Takeda Pipeline Message] Sorry, the coverage file is not present. Please make sure a VarScan consensus table (*.consensus.vcf) exists at the path passed to this plot step.")
         return False
 
     input_dir = '/'.join(input_dir.split('/')[:-1])
@@ -105,7 +153,11 @@ def plot_coverage_plots_manager(input_dir):
     #Create a output direcotry for the coverage plot.
     plots_output_dir_path = create_plots_output_directory(input_dir)
 
-    consensus_rows = read_consensus_file(consensus_file_path)
+    reference_length = None
+    if reference_file_path and os.path.exists(reference_file_path):
+        reference_length = get_reference_length(reference_file_path)
+
+    consensus_rows = read_consensus_file(consensus_file_path, reference_length)
     plot_graphs(consensus_rows, cell_line_id, plots_output_dir_path)
 
 

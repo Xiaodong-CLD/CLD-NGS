@@ -23,6 +23,8 @@ import subprocess
 
 import pysam
 
+from pipeline_io import gzip_ok
+
 
 def gatk_runner(reference_path, sorted_bam_path, output_dir):
     """Run GATK HaplotypeCaller; return the bgzipped VCF path (or False on failure)."""
@@ -35,10 +37,20 @@ def gatk_runner(reference_path, sorted_bam_path, output_dir):
 
     os.makedirs(output_dir, exist_ok=True)
     output_vcf_path = os.path.join(output_dir, "gatk_variants.vcf.gz")
+    tmp_vcf_path = os.path.join(output_dir, "gatk_variants.tmp.vcf.gz")
 
-    if os.path.exists(output_vcf_path):
+    # Require a complete bgzipped VCF (not just present) so a truncated file
+    # from an interrupted/killed HaplotypeCaller run is re-run, not reused.
+    if gzip_ok(output_vcf_path):
         print("[Takeda Pipeline Message] GATK HaplotypeCaller already executed; skipping.")
         return output_vcf_path
+
+    # Remove any partial leftovers (final + temp VCF + tabix index) from a
+    # failed run so we start clean.
+    for p in (output_vcf_path, output_vcf_path + ".tbi",
+              tmp_vcf_path, tmp_vcf_path + ".tbi"):
+        if os.path.exists(p):
+            os.remove(p)
 
     try:
         # Number of mapped reads (used to size --max-reads-per-alignment-start).
@@ -52,6 +64,9 @@ def gatk_runner(reference_path, sorted_bam_path, output_dir):
         if not os.path.exists(ref_no_ext + ".dict") and not os.path.exists(reference_path + ".dict"):
             subprocess.check_call(["gatk", "CreateSequenceDictionary", "-R", reference_path])
 
+        # Write to a temp VCF and atomically rename only after a gzip integrity
+        # check passes, so a killed HaplotypeCaller never leaves a partial VCF
+        # at the canonical path.
         reads_consider = number_of_reads * 2
         subprocess.check_call([
             "gatk", "HaplotypeCaller",
@@ -61,10 +76,19 @@ def gatk_runner(reference_path, sorted_bam_path, output_dir):
             "--stand-call-conf", "20",
             "--active-probability-threshold", "0.0002",
             "--min-base-quality-score", "5",
-            "-O", output_vcf_path,
+            "-O", tmp_vcf_path,
         ])
+        if not gzip_ok(tmp_vcf_path):
+            raise subprocess.CalledProcessError(1, "gatk HaplotypeCaller")
+        os.replace(tmp_vcf_path, output_vcf_path)
+        if os.path.exists(tmp_vcf_path + ".tbi"):
+            os.replace(tmp_vcf_path + ".tbi", output_vcf_path + ".tbi")
     except subprocess.CalledProcessError as error:
         print(f"[Takeda Pipeline Message] GATK HaplotypeCaller failed: {error}")
+        for p in (output_vcf_path, output_vcf_path + ".tbi",
+                  tmp_vcf_path, tmp_vcf_path + ".tbi"):
+            if os.path.exists(p):
+                os.remove(p)
         return False
 
     print("[Takeda Pipeline Message] HaplotypeCaller executed successfully.")
@@ -105,9 +129,12 @@ def get_gatk_counts(vcf_file_path):
             sum_ad = sum(ad_values)
             dp_format = record.samples[0].get('DP', None)
             dp_info = record.info.get('DP', None)
-            af_pct = round(100.0 * reads_count / dp_format, 2) if dp_format else None
+            # pct_alt: ALT fraction among GATK-attributed reads (reads_count / sum_AD).
+            pct_alt = round(100.0 * reads_count / sum_ad, 2) if sum_ad else None
+            # pct_sum_ad: how much of the raw locus depth GATK could attribute to an allele (sum_AD / DP_INFO).
+            pct_sum_ad = round(100.0 * sum_ad / dp_info, 2) if dp_info else None
             counts.append((start_pos + 1, end_pos, reads_count, svtype, wt_reads_count,
-                           sum_ad, dp_format, dp_info, af_pct))
+                           sum_ad, dp_format, dp_info, pct_alt, pct_sum_ad))
     return counts
 
 
@@ -116,10 +143,10 @@ def write_counts_to_file(output_file_path, total_mapped_reads, gatk_counts):
     with open(output_file_path, 'w') as f:
         f.write(f"# total number of analyzed reads: {total_mapped_reads}\n")
         f.write(f"# number of unanalyzed/uninformative reads: {total_mapped_reads - total_ko_reads}\n")
-        f.write("start_pos\tend_pos\treads_count\tSVTYPE\tWT_reads_count\tsum_AD\tDP_FORMAT\tDP_INFO\tAF_pct\n")
+        f.write("start_pos\tend_pos\treads_count\tSVTYPE\tWT_reads_count\tsum_AD\tDP_FORMAT\tDP_INFO\tpct_alt\tpct_sum_ad\n")
         for count in gatk_counts:
             f.write(f"{count[0]}\t{count[1]}\t{count[2]}\t{count[3]}\t{count[4]}\t"
-                    f"{count[5]}\t{count[6]}\t{count[7]}\t{count[8]}\n")
+                    f"{count[5]}\t{count[6]}\t{count[7]}\t{count[8]}\t{count[9]}\n")
 
 
 def count_reads_gatk(bam_file_path, gatk_vcf_file_path, output_file_path):

@@ -32,14 +32,10 @@ from typing import Dict, List, Set, Tuple
 
 import pysam
 
-LOG_PREFIX = "[Takeda Pipeline Message]"
+from pipeline_io import log
 
 # SAM flags to exclude (`samtools view -F 3332`).
 EXCLUDE_FLAGS = 4 | 256 | 1024 | 2048  # = 3332
-
-
-def log(msg: str) -> None:
-    print(f"{LOG_PREFIX} {msg}", flush=True)
 
 
 def _read_passes_filter(read: pysam.AlignedSegment) -> bool:
