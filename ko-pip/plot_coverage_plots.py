@@ -53,8 +53,9 @@ def read_consensus_file(consensus_file_path, reference_length=None):
     ``[position, ref_reads, var_reads]`` per position for the coverage plot.
 
     The consensus file is the plain tabular ``mpileup2cns`` output (despite the
-    ``.consensus.vcf`` name): column 4 (``Reads1``) is the reference-supporting
-    read count and column 5 (``Reads2``) is the variant-supporting read count.
+    ``.consensus.vcf`` name): column 4 is the packed field
+    ``Cons:Cov:Reads1:Reads2:Freq:P-value``; ``Reads1`` (ref-supporting reads)
+    is colon-index 2 and ``Reads2`` (variant-supporting reads) is colon-index 3.
 
     Positions with no consensus entry are padded with zero coverage so the plot
     spans the full amplicon instead of starting partway in: positions before the
@@ -69,9 +70,12 @@ def read_consensus_file(consensus_file_path, reference_length=None):
 
     consensus_rows = []
     for i in rows[1:]:
-        if len(i) < 6:
+        if len(i) < 5:
             continue
-        consensus_rows.append([_safe_int(i[1]), _safe_int(i[4]), _safe_int(i[5])])
+        packed = i[4].split(':')
+        if len(packed) < 4:
+            continue
+        consensus_rows.append([_safe_int(i[1]), _safe_int(packed[2]), _safe_int(packed[3])])
 
     if not consensus_rows:
         return consensus_rows
@@ -88,13 +92,14 @@ def read_consensus_file(consensus_file_path, reference_length=None):
     return padded
 
 
-def plot_graphs(consensus_rows, cell_line_id, plots_output_dir_path):
+def plot_graphs(consensus_rows, cell_line_id, plots_output_dir_path, sample_id=None):
     '''
     Two traces per plot:
       - Reference: reads supporting the reference nucleotide at each position.
       - Variant:   reads supporting a non-reference (variant) nucleotide.
 
-    Writes a static ``coverage_plot.jpeg`` via kaleido (pinned to 0.2.1, which
+    Writes a static ``<sample_id>_coverage_plot.jpeg`` (or ``coverage_plot.jpeg``
+    when ``sample_id`` is not given) via kaleido (pinned to 0.2.1, which
     bundles chromium and needs no system Chrome).
     '''
     x_axis = [i[0] for i in consensus_rows]
@@ -117,13 +122,14 @@ def plot_graphs(consensus_rows, cell_line_id, plots_output_dir_path):
         yaxis_title="Number of Reads",
     )
 
-    image_path = os.path.join(plots_output_dir_path, "coverage_plot.jpeg")
+    image_name = f"{sample_id}_coverage_plot.jpeg" if sample_id else "coverage_plot.jpeg"
+    image_path = os.path.join(plots_output_dir_path, image_name)
     fig.write_image(image_path)
 
     return True
 
 
-def plot_coverage_plots_manager(input_dir, reference_file_path=None):
+def plot_coverage_plots_manager(input_dir, reference_file_path=None, output_dir=None):
     if input_dir is None:
         #Take in the reference file as arguments.
         parser = argparse.ArgumentParser()
@@ -138,8 +144,10 @@ def plot_coverage_plots_manager(input_dir, reference_file_path=None):
         reference_file_path = args['reference']
 
     #Get the consensus file.
-    cell_line_id = input_dir.rstrip('/').split('/')[-1]
-    # cell_line_id:Spike-Mut10-1_S7_L001.consensus.vcf
+    cell_line_id = os.path.splitext(os.path.basename(input_dir.rstrip('/')))[0]
+    # strip .consensus.vcf to leave just the sample name
+    if cell_line_id.endswith('.consensus'):
+        cell_line_id = cell_line_id[:-len('.consensus')]
     print("[Takeda Pipeline Message] Creating coverage plot for cell line: {} using plotly".format(cell_line_id))
 
     consensus_file_path = input_dir
@@ -147,18 +155,19 @@ def plot_coverage_plots_manager(input_dir, reference_file_path=None):
         print("[Takeda Pipeline Message] Sorry, the coverage file is not present. Please make sure a VarScan consensus table (*.consensus.vcf) exists at the path passed to this plot step.")
         return False
 
-    input_dir = '/'.join(input_dir.split('/')[:-1])
-    input_dir = os.path.dirname(input_dir)
-
-    #Create a output direcotry for the coverage plot.
-    plots_output_dir_path = create_plots_output_directory(input_dir)
+    if output_dir is not None:
+        plots_output_dir_path = output_dir
+        os.makedirs(plots_output_dir_path, exist_ok=True)
+    else:
+        derived_dir = os.path.dirname(os.path.dirname(input_dir))
+        plots_output_dir_path = create_plots_output_directory(derived_dir)
 
     reference_length = None
     if reference_file_path and os.path.exists(reference_file_path):
         reference_length = get_reference_length(reference_file_path)
 
     consensus_rows = read_consensus_file(consensus_file_path, reference_length)
-    plot_graphs(consensus_rows, cell_line_id, plots_output_dir_path)
+    plot_graphs(consensus_rows, cell_line_id, plots_output_dir_path, sample_id=cell_line_id)
 
 
 if __name__ == "__main__":

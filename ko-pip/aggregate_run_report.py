@@ -544,6 +544,7 @@ def aggregate_consensus(results_dir, sample_records, output_path):
 
 def aggregate_run_report(results_dir, final_report_dir, sample_records):
     """Write the run-level tables under final_report_dir."""
+    import shutil
     os.makedirs(final_report_dir, exist_ok=True)
     aggregate_snv(results_dir, sample_records, os.path.join(final_report_dir, 'all_snv.tsv'))
     aggregate_indel(results_dir, sample_records, os.path.join(final_report_dir, 'all_indel.tsv'))
@@ -553,6 +554,14 @@ def aggregate_run_report(results_dir, final_report_dir, sample_records):
                           os.path.join(final_report_dir, 'all_breakpoints.tsv'))
     aggregate_consensus(results_dir, sample_records,
                         os.path.join(final_report_dir, 'all_consensus.fa'))
+
+    # Collect per-sample coverage plots into final_report/coverage_plots/
+    coverage_plots_dir = os.path.join(final_report_dir, 'coverage_plots')
+    os.makedirs(coverage_plots_dir, exist_ok=True)
+    for folder_name, _sid, _clone in sample_records:
+        src = os.path.join(results_dir, folder_name, 'plots', f'{folder_name}_coverage_plot.jpeg')
+        if os.path.exists(src):
+            shutil.copy2(src, coverage_plots_dir)
 
 
 if __name__ == '__main__':

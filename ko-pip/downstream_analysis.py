@@ -197,7 +197,8 @@ def downstream_analysis(
     pathlib.Path(plots_dir).mkdir(parents=True, exist_ok=True)
 
     # Coverage plot from the VarScan consensus VCF (padded to full amplicon length).
-    plot_coverage_plots_manager(output_consensus_vcf_file_path, reference_file_path=reference_path)
+    plot_coverage_plots_manager(output_consensus_vcf_file_path, reference_file_path=reference_path,
+                                output_dir=plots_dir)
 
 
 
