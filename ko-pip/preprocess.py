@@ -14,7 +14,7 @@ import argparse
 import subprocess
 import os
 
-from pipeline_io import is_nonempty, count_fastq_reads, commit
+from pipeline_io import is_nonempty, count_fastq_reads
 
 
 def fastp_runner(input_fastq_file_1_path, input_fastq_file_2_path,
@@ -142,8 +142,14 @@ def data_preprocessing(input_fastq_file_1_path, input_fastq_file_2_path,
     trimmed_fastq_file_1_path, trimmed_fastq_file_2_path = fastp_runner(
         input_fastq_file_1_path, input_fastq_file_2_path,
         output_dir, naming_prefix, ext=ext, report_dir=report_dir)
+    if trimmed_fastq_file_1_path is False:
+        return False, False
     corrected_fastq_file_1_path, corrected_fastq_file_2_path = error_correction(
         trimmed_fastq_file_1_path, trimmed_fastq_file_2_path)
+
+    if corrected_fastq_file_1_path is False:
+        print("[Takeda Pipeline Message] Skipping error correction; using trimmed reads.")
+        return trimmed_fastq_file_1_path, trimmed_fastq_file_2_path
 
     return corrected_fastq_file_1_path, corrected_fastq_file_2_path
 
