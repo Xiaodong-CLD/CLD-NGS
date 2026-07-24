@@ -191,8 +191,8 @@ def main(argv: List[str] | None = None) -> int:
         print(f"  {sid}\traw={nr}\tbamout={nb}\tuninf={nu}", file=sys.stderr)
 
     # --- Pass 2: emit BAM + TSV ------------------------------------------
-    unsorted_bam = args.output_dir / f"{sample}.bam"
-    sorted_bam = args.output_dir / f"{sample}.sorted.bam"
+    unsorted_bam = args.output_dir / f"{sample}.uninformative.bam"
+    sorted_bam   = args.output_dir / f"{sample}.uninformative.sorted.bam"
 
     written_keys: Set[Tuple[str, bool]] = set()
 
