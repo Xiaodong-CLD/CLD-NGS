@@ -8,10 +8,11 @@ a directory of paired-end .fastq files. For each pair of fastq files in
 the input directory, it creates a directory in the output folder, where
 all the output files from the analysis of that pair will be placed.
 
-The user specifies an input directory of .fastq files (-i), an optional output
-directory (-o, default: current directory), a reference FASTA (-r), and a
-directory of plasmid FASTAs to BLAST breakpoint clusters against (-br). If the
-output directory is not provided, the current working directory is used.
+The user specifies a directory of paired-end .fastq files (-i), a sample sheet
+(.xlsx) as a direct file path (-s), an optional output directory (-o, default:
+current directory), a reference FASTA (-r), and a directory of plasmid FASTAs
+to BLAST breakpoint clusters against (-br). If the output directory is not
+provided, the current working directory is used.
 
 Original script created by Lilin Huang.
 
@@ -67,7 +68,8 @@ def name(string):
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description='A pipeline for genome assembly.')
-parser.add_argument('-i', '--input_dir', required=True, help='Input directory containing fastq files')
+parser.add_argument('-i', '--input_dir', required=True, help='Directory containing fastq files')
+parser.add_argument('-s', '--sample_sheet', required=True, help='Path to the sample sheet (.xlsx)')
 parser.add_argument('-o', '--output_dir', default=os.getcwd(), help='Output directory (default is current directory)')
 parser.add_argument('-r', '--reference', required=True, help='Path to the reference genome')
 parser.add_argument('-br', '--blast_ref', required=True,
@@ -82,8 +84,10 @@ if not any(glob.glob(os.path.join(args.blast_ref, ext))
            for ext in ('*.fa', '*.fasta', '*.fna')):
     parser.error(f"--blast_ref contains no FASTA (*.fa/*.fasta/*.fna): {args.blast_ref}")
 
-# Check if name.xlsx exists
-config_f = glob.glob(os.path.join(args.input_dir, 'sample_xlsx','*.xlsx'))[0]
+# Validate sample sheet
+if not os.path.isfile(args.sample_sheet):
+    parser.error(f"--sample_sheet not found: {args.sample_sheet}")
+config_f = args.sample_sheet
 reference_path = args.reference
 sample_records = []
 
@@ -158,8 +162,8 @@ for sample_idx in d:
     # Read source FASTQ files directly — fastp_runner renames + writes
     # trimmed outputs under tmp_sample_dir, and HTML/JSON QC reports under
     # Results/<sample>/qc/ where they persist as deliverables.
-    fq_1_path = os.path.join(args.input_dir, 'Fastq', fq_1_name)
-    fq_2_path = os.path.join(args.input_dir, 'Fastq', fq_2_name)
+    fq_1_path = os.path.join(args.input_dir, fq_1_name)
+    fq_2_path = os.path.join(args.input_dir, fq_2_name)
     qc_dir = os.path.join(sample_dir, 'qc')
 
     # Run fastp_runner + bfc to perform data preprocessing
@@ -170,6 +174,11 @@ for sample_idx in d:
         ext=fq_ext,
         report_dir=qc_dir,
     )
+    if processed_fastq_file_1_path is False:
+        raise RuntimeError(
+            f"[{naming}] Preprocessing (fastp/bfc) failed — see messages above. "
+            f"Check that the FASTQ files are readable: {fq_1_path}"
+        )
     
     # Perform assembly (alignment intermediates written under tmp_sample_dir)
     sorted_bam_file_path, mpileup_file_path, _depth_file_path, _collated_bam_file_path = assembly(processed_fastq_file_1_path, processed_fastq_file_2_path,reference_path,tmp_sample_dir)

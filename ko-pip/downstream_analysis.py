@@ -117,7 +117,7 @@ def downstream_analysis(
                 '--sample', _sid,
             ])
 
-            uninf_bam = os.path.join(igv_folder, f'{_sid}.sorted.bam')
+            uninf_bam = os.path.join(igv_folder, f'{_sid}.uninformative.sorted.bam')
 
             compute_uninformative_summary([
                 '-b', str(uninf_bam),
