@@ -182,6 +182,10 @@ for sample_idx in d:
     
     # Perform assembly (alignment intermediates written under tmp_sample_dir)
     sorted_bam_file_path, mpileup_file_path, _depth_file_path, _collated_bam_file_path = assembly(processed_fastq_file_1_path, processed_fastq_file_2_path,reference_path,tmp_sample_dir)
+    if sorted_bam_file_path is False:
+        raise RuntimeError(
+            f"[{naming}] Assembly (alignment/samtools) failed — see messages above."
+        )
 
     # Perform downstream analysis (persistent results under sample_dir)
         

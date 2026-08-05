@@ -67,6 +67,8 @@ def alignment(processed_fastq_file_1_path, processed_fastq_file_2_path,reference
 def assembly(processed_fastq_file_1_path, processed_fastq_file_2_path,reference_path,sample_dir):
     
     bam_file_path = alignment(processed_fastq_file_1_path, processed_fastq_file_2_path,reference_path,sample_dir)
+    if bam_file_path is False:
+        return False, False, False, False
     sorted_bam_file_path, mpileup_file_path, depth_file_path, collated_bam_file_path = samtools_runner(bam_file_path, reference_path)
     
     return sorted_bam_file_path, mpileup_file_path, depth_file_path, collated_bam_file_path
