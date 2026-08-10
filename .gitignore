@@ -1,3 +1,9 @@
+# Pipeline app run outputs
+pipeline_app/runs/
+
+# Experiment: pindel indel sensitivity benchmark — run intermediates only (BAMs, mpileup, pindel raw output)
+expt_summer2026/amp-pip-dev/2026-07_pindel_indel_sensitivity/runs/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -217,3 +223,34 @@ amp-pip-dev/tools/
 amp-pip-dev/experiments/
 amp-pip-dev/benchmarks/
 amp-pip-dev/**/__pycache__/
+
+# tla-pip
+# data/ contains large reference genomes (host genome ~6 GB, mixed_ref ~7 GB) — ignore entirely
+# logs/ contains run logs — ignore
+# tools/__pycache__ covered by global __pycache__ rule
+tla-pip/runs/
+tla-pip/data/
+tla-pip/test/
+tla-pip/P3_TLA/
+tla-pip/logs/
+tla-pip/**/*.bam
+tla-pip/**/*.bai
+tla-pip/**/*.gridsscache
+
+# expt_summer2026 - intermediate/generated files; keep only scripts
+expt_summer2026/**/input/
+expt_summer2026/**/output/
+expt_summer2026/**/logs/
+expt_summer2026/**/*.fastq
+expt_summer2026/**/*.fastq.gz
+expt_summer2026/**/*.fq
+expt_summer2026/**/*.fq.gz
+
+# Pindel simulation experiment caches
+expt_summer2026/amp-pip-dev/2026-07_pindel_indel_sensitivity/runs/
+expt_summer2026/amp-pip-dev/2026-07_pindel_indel_sensitivity/references/
+expt_summer2026/amp-pip-dev/2026-07_pindel_indel_sensitivity/results/**/nearmiss.csv
+
+# pipeline_app - pipeline app run cache
+pipeline_app/runs/*
+pipeline_app/.streamlit/*
