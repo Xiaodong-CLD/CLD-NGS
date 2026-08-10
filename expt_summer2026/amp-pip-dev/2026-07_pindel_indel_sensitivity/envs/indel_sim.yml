@@ -1,0 +1,23 @@
+name: indel_sim
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  # --- core language ---
+  - python=3.10
+  # --- read simulation ---
+  - art=2016.06.05
+  # --- alignment / variant tools ---
+  - bwa=0.7.19
+  - samtools=1.23.1
+  - pindel=0.2.5b9
+  # --- python libs for reporting ---
+  - pandas
+  - numpy
+  - matplotlib
+  - plotly
+  # --- coverage plot export: keep kaleido 0.x (bundles chromium, no system Chrome) ---
+  - python-kaleido=0.2.1
+  # --- notebook kernel registration ---
+  - ipykernel
