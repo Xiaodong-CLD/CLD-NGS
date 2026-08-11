@@ -94,7 +94,7 @@ All outputs are written under `<output-dir>/`:
 ```
 <output-dir>/
 ├─ Results/
-│  ├─ snp.txt                      run-level SNP report (VarFreq ≥ 2%)
+│  ├─ snp.txt                      run-level SNP report (VarFreq ≥ 1%)
 │  ├─ indel.txt                    run-level indel report (≥ 1% AF, all callers)
 │  └─ <sample>/
 │     ├─ *.fastp.html / .json      fastp QC reports
@@ -107,7 +107,7 @@ All outputs are written under `<output-dir>/`:
                                    safe to delete after reviewing Results/
 ```
 
-- **`Results/snp.txt`** — run-level SNP summary (VarScan, variants ≥ 2% AF).
+- **`Results/snp.txt`** — run-level SNP summary (VarScan, variants ≥ 1% AF).
   Replicate-aware when `Clone ID (optional)` is filled for every sample: a
   variant is reported only when it appears in ≥ 1 replicate of a clone. Falls
   back to per-sample reporting when clone IDs are absent.
@@ -125,7 +125,7 @@ All outputs are written under `<output-dir>/`:
 | Filter | Value | Location |
 |--------|-------|----------|
 | SNP minimum coverage | 1500 reads | `varscan_wrapper.py` |
-| SNP report frequency | ≥ 2% VarFreq | `pipeline_combined.py` |
+| SNP report frequency | ≥ 1% VarFreq | `pipeline_combined.py` |
 | Indel report frequency | ≥ 1% AF (any caller) | `pipeline_combined.py` |
 | samtools pileup depth cap | uncapped (`-d 0`) | `samtools_wrapper.py` |
 
@@ -201,5 +201,4 @@ amp-pip-dev/
 
 - [docs/upgrade-2026.md](docs/upgrade-2026.md) — full technical change log
 - [docs/User Manual Amp Var Calling.pdf](docs/User%20Manual%20Amp%20Var%20Calling.pdf) — end-user manual
-- [AGENTS.md](AGENTS.md) — invariants and rules for AI-assisted code changes
 - `expt_summer2026/amp-pip-dev/` — benchmarking experiments (mpileup depth, Pindel insert size, caller comparison)

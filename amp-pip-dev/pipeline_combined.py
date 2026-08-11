@@ -327,8 +327,8 @@ snp_combined_orig = pd.concat(snp_dfs)
 snp_combined_orig = snp_combined_orig.drop(['Strands1', 'Strands2', 'Qual1', 'Qual2', 'MapQual1', 'MapQual2'], axis=1)
 # Converting string percentages to float
 snp_combined_orig['VarFreq'] = snp_combined_orig['VarFreq'].apply(lambda x: float(x[:-1]))
-# Dropping all entries with VarFreq < 2%
-snp_combined_orig = snp_combined_orig[snp_combined_orig['VarFreq'] >= 2]
+# Dropping all entries with VarFreq < 1%
+snp_combined_orig = snp_combined_orig[snp_combined_orig['VarFreq'] >= 1]
 # Converting back to string
 snp_combined_orig['VarFreq'] = snp_combined_orig['VarFreq'].apply(lambda x: str(x) + '%')
 
@@ -361,7 +361,7 @@ if clone_for_every_sample:
             out_f.write(f"CloneID: {clone_id}\n")
             out_f.write(f"Replicate Sample IDs: {', '.join(str(x) for x in sample_l)}\n")
             if clone_output_df.empty:
-                out_f.write('No positions with variants above 2% frequency in all replicates\n\n')
+                out_f.write('No positions with variants above 1% frequency in all replicates\n\n')
             else:
                 out_f.write(f"{clone_output_df.to_string(index=False)}\n\n")
 else:
@@ -370,7 +370,7 @@ else:
             out_f.write(f"SampleID: {sample_id}\n")
             sample_df = snp_combined_orig.loc[snp_combined_orig['SampleID'] == sample_id] 
             if sample_df.empty:
-                out_f.write('No positions with variants above 2% frequency\n\n')
+                out_f.write('No positions with variants above 1% frequency\n\n')
             else:
                 out_f.write(f"{sample_df.to_string(index=False)}\n\n")
 
