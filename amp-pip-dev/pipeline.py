@@ -3,6 +3,7 @@ from bwa_wrapper import bwa_runner
 from samtools_wrapper import samtools_runner
 from varscan_wrapper import varscan_runner
 from pindel_wrapper import pindel_runner
+from lofreq_wrapper import lofreq_runner
 from fastp_wrapper import fastp_runner
 from plot_coverage_plots import plot_coverage_plots_manager
 
@@ -35,9 +36,10 @@ def call_snvs(pileup_file_path):
 
 def call_indels(sorted_bam_file_path, reference_file_path):
     '''
-    We'll be using PINDEL for getting the possible InDels from the BAM files.
+    We'll be using PINDEL and LoFreq for getting the possible InDels from the BAM files.
     '''
     pindel_runner(sorted_bam_file_path, reference_file_path)
+    lofreq_runner(sorted_bam_file_path, reference_file_path)
 
 def pipeline_manager():
     #####ARGUMENTS######

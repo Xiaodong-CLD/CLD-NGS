@@ -34,7 +34,7 @@ def samtools_runner(bam_file_path, reference_file_path):
 
         print("[Takeda Pipeline Message] Creating the .mpileup file...")
         # -d 0: uncapped max depth for deep amplicon-seq assay.
-        # See experiments/2026-06-mpileup-depth-cap/. Do NOT copy to WGS/panels.
+        # See expt_summer2026/amp-pip-dev/2026-06_amp-pip-update/2026-06-mpileup-depth-cap/. Do NOT copy to WGS/panels.
         bash_output = subprocess.check_output("samtools mpileup -d 0 -f " + reference_file_path + " " + sorted_bam_file_path + " -A > " + mpileup_file_path, shell = True)
 
         print("[Takeda Pipeline Message] Generating coverage files and plots.")
