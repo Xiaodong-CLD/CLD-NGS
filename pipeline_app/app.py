@@ -10,7 +10,7 @@ import pathlib
 import streamlit as st
 
 import utils as common
-from pipelines import tla, ko, amp, rnaseq_var
+from pipelines import tla, ko, amp, rnaseq_var, unmap
 
 # ---------------------------------------------------------------------------
 # Pipeline registry – add one entry per new pipeline module.
@@ -20,6 +20,7 @@ PIPELINES = {
     ko.PIPELINE_ID:         ko,
     amp.PIPELINE_ID:        amp,
     rnaseq_var.PIPELINE_ID: rnaseq_var,
+    unmap.PIPELINE_ID:      unmap,
 }
 
 # ---------------------------------------------------------------------------

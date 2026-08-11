@@ -105,6 +105,10 @@ def render_form(prefill: dict | None = None) -> dict | None:
                 st.session_state[key] = val
 
     with st.form("rnaseqvar_form"):
+        st.warning(
+            "⚠️ **Not fully tested** — This pipeline integration has not been "
+            "end-to-end validated inside the app. Verify outputs manually after the run."
+        )
         st.info(
             "**RNAseq Variant Calling (RNAseq-var)** — BWA-based SNP and indel calling "
             "from RNA-seq data for any gene of interest.  \n"
