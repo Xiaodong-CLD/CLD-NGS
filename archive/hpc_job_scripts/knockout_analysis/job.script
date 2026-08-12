@@ -1,0 +1,30 @@
+#!/bin/bash -l
+#SBATCH -J knockout_pipeline
+#SBATCH -N 8
+#SBATCH --ntasks-per-node=24
+#SBATCH --time=0-48:00:00
+#SBATCH --qos=normal
+
+echo "== Starting run at $(date)"
+echo "== Job ID: ${SLURM_JOBID}"
+echo "== Node list: ${SLURM_NODELIST}"
+echo "== Submit dir. : ${SLURM_SUBMIT_DIR}"
+# Your more useful application can be started below!
+
+# Activate the conda environment
+conda activate assembly
+
+# Define the path for the script relative to the current directory
+PIPELINE_SCRIPT_PATH="$(dirname "$SLURM_SUBMIT_DIR")/voof/ko-pip/pipeline_combined.py"
+
+# Assuming there's only one .fa file in the $SLURM_SUBMIT_DIR/reference directory
+FA_FILE=$(ls $SLURM_SUBMIT_DIR/reference/*.fa | head -n 1)
+if [[ -f "$FA_FILE" ]]; then
+    # Run the pipeline script with the directory path
+    python3 -u "${PIPELINE_SCRIPT_PATH}" -i "${SLURM_SUBMIT_DIR}" -o "${SLURM_SUBMIT_DIR}" -r "${FA_FILE}"
+else
+    echo "No .fa file found in $SLURM_SUBMIT_DIR/reference"
+fi
+
+# Deactivate conda environment if needed
+conda deactivate

@@ -10,12 +10,8 @@ from collections import defaultdict
 # Argument parser
 parser = argparse.ArgumentParser()
 parser.add_argument('input_dir', help='Input directory containing folders')
-parser.add_argument('star_combined', help='Path to the directory of combined STAR index')
-parser.add_argument('star_human', help='Path to the directory of human STAR index')
-parser.add_argument('star_goi', help='Path to the directory of goi STAR index')
-parser.add_argument('goi_seq', help='Path to the goi seq file')
 args = parser.parse_args()
-
+current_dir = pathlib.Path(__file__).parent.resolve()
 def name(string):
     prefix = string.split("_L")[0]
     return prefix
@@ -29,15 +25,47 @@ def add_newline_if_needed(file_path):
             print(f"File {file_path} does not end with a newline, adding one...")
             file.write(b'\n')
 
-config_f = glob.glob("*.xlsx")[0]
+config_f = glob.glob("sample_xlsx/*.xlsx")[0]
 config_f_basename = config_f.rstrip('.xlsx')
 sheet = pd.read_excel(config_f, index_col=0)
 sheet = sheet.fillna('')
 d = sheet.to_dict(orient='index')
 
-goi_fasta = glob.glob(os.path.join(args.input_dir,'goi','*'))[0]
-
+# Combine files
+ref_seq_path = glob.glob(os.path.join(args.input_dir, 'reference', '*'))[0]
+goi_seq_path = glob.glob(os.path.join(args.input_dir, 'goi', '*'))[0]
 output_dir = os.path.join(args.input_dir,"Result/")
+combined_fasta = os.path.join(output_dir, 'combined.fasta')
+
+
+# Index for ref genome
+ref_fasta = os.path.join(output_dir, 'ref.fasta')
+if not os.path.exists(ref_fasta):
+    print("Pipeline: Creating a reference for ref genome...")
+    # Copy the ref_seq into ref.fasta
+    subprocess.run(['cp', ref_seq_path, ref_fasta], check=True)
+    # Add newline if not already present
+    add_newline_if_needed(ref_fasta)
+    subprocess.run(['bwa', 'index', ref_fasta], check=True)
+
+# Index for goi
+goi_fasta = os.path.join(output_dir, 'goi.fasta')
+if not os.path.exists(goi_fasta):
+    print("Pipeline: Creating a reference for goi...")
+    # Copy the goi_seq into goi.fasta
+    subprocess.run(['cp', goi_seq_path, goi_fasta], check=True)
+    # Add newline if not already present
+    add_newline_if_needed(goi_fasta)
+    subprocess.run(['bwa', 'index', goi_fasta], check=True)
+
+# Generate the combined.fasta and index it before processing the samples
+if not os.path.exists(combined_fasta):
+    print("Takeda pipeline: Creating a combined reference...")
+    # Use shell command to concatenate ref_seq and goi_seq into combined.fasta
+    with open(combined_fasta, 'w') as outfile:
+        subprocess.run(['cat', goi_fasta, ref_fasta], stdout=outfile, check=True)
+    subprocess.run(['bwa', 'index', combined_fasta], check=True)
+
 
 snp_dfs = []
 clone_samples = defaultdict(list)
@@ -54,6 +82,7 @@ for sample_idx in d:
     else:
         clone_samples[fq_clone].append(sample_idx)
         fq_new_base = f"{sample_idx}_{fq_clone}"
+
 
     # Copy fastq files
     fq_1_name = d[sample_idx]['fastq (forward)']
@@ -80,23 +109,24 @@ for sample_idx in d:
     shutil.copyfile(fq_2_path, fq_2_new_path)
 
     fastq_sample_dir = os.path.abspath(sample_dir)
-
-    subprocess.run(["bash", "/mnt/efs/home/zds0975/pipeline_test/voof/RNAseq-var/var_calling.sh", 
+    var_calling_path = os.path.join(current_dir, 'var_calling.sh')
+    subprocess.run(["bash", var_calling_path, 
                 "-d", fastq_sample_dir, 
                 "-o", sample_dir,
-                "-c", args.star_combined, 
-                "-r", args.star_human, 
-                "-g", args.star_goi,
-                "-s",args.goi_seq], 
+                "-c", combined_fasta, 
+                "-r", ref_fasta, 
+                "-g", goi_fasta], 
                 check=True)
 
+    
     snp_vcf_folder = os.path.join(sample_dir, naming,f"{naming}.snp")
     snp_vcf_path = os.path.join(snp_vcf_folder, f"{naming}.goi.mpileup.snp.vcf")
     snp_vcf_aa_path = os.path.join(snp_vcf_folder, f"{naming}.goi.mpileup.snp.amino_annotated.vcf")
     
-     # Run amino acid annotation on varscan snp output
+    # Run amino acid annotation on varscan snp output
+    varscan_path = os.path.join(current_dir, '..', 'amino-anno', 'from_varscan.py')
     subprocess.run(["python3",
-                    "/mnt/efs/home/zds0975/pipeline_test/voof/amino-anno/from_varscan.py",
+                    varscan_path,
                     snp_vcf_path,
                     goi_fasta,
                     "-o",
@@ -129,7 +159,7 @@ if clone_for_every_sample:
     for k,v in by_sample_pos_cons.items():
         by_clone_by_pos_cons[v['CloneID']][k[1:]].append(k[0])  # k[1:] corresponds to ('Position', 'Cons')
 
-    with open(f"{config_f_basename}.snp.txt", 'w') as out_f:
+    with open(f"{args.input_dir}/Result/snp.txt", 'w') as out_f:
         for clone_id,sample_ids in clone_samples.items():
             clone_output_df = pd.DataFrame()
             sample_l = clone_samples[clone_id]
@@ -152,7 +182,7 @@ if clone_for_every_sample:
             else:
                 out_f.write(f"{clone_output_df.to_string(index=False)}\n\n")
 else:
-    with open(f"{config_f_basename}.snp.txt", 'w') as out_f:
+    with open(f"{args.input_dir}/Result/snp.txt", 'w') as out_f:
         for sample_id in d:
             out_f.write(f"SampleID: {sample_id}\n")
             sample_df = snp_combined_orig.loc[snp_combined_orig['SampleID'] == sample_id] 

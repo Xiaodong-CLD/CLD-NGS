@@ -1,0 +1,27 @@
+#!/bin/bash -l
+#SBATCH -J RNA-seq_pipeline
+#SBATCH -N 8
+#SBATCH --ntasks-per-node=24
+#SBATCH --time=0-48:00:00
+#SBATCH --qos=normal
+ 
+echo "== Starting run at $(date)"
+echo "== Job ID: ${SLURM_JOBID}"
+echo "== Node list: ${SLURM_NODELIST}"
+echo "== Submit dir. : ${SLURM_SUBMIT_DIR}"
+# Your more useful application can be started below!
+
+# Make sure to create the Result directory inside the same directory where the job script is located
+mkdir -p "${SLURM_SUBMIT_DIR}/Result"
+
+# Activate the conda environment
+source activate RNAseq
+
+# Define the path for the script relative to the current directory
+PIPELINE_SCRIPT_PATH="$(dirname "$SLURM_SUBMIT_DIR")/voof/RNAseq-var/pipeline_run.py"
+
+# Run the pipeline script with the directory path
+python3 -u "${PIPELINE_SCRIPT_PATH}" "${SLURM_SUBMIT_DIR}"
+
+# Deactivate conda environment if needed
+conda deactivate

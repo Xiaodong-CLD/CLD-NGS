@@ -1,0 +1,31 @@
+# Exp B exact-detection rate vs breakpoint position at the -e ceiling, averaged over seeds
+# dataset=LAGA_LC read_len=75 (rows=amplicon position, cols=indel type)
+amplicon_pos,del,ins
+37,1.0,1.0
+70,1.0,1.0
+90,0.0,0.8
+355,1.0,1.0
+621,0.0,0.0
+641,0.0,0.0
+674,0.0,0.0
+
+# dataset=LAGA_LC read_len=150 (rows=amplicon position, cols=indel type)
+amplicon_pos,del,ins
+37,1.0,1.0
+70,1.0,1.0
+90,0.0,1.0
+355,1.0,1.0
+621,0.0,0.0
+641,0.0,0.0
+674,0.0,0.0
+
+# dataset=LAGA_LC read_len=250 (rows=amplicon position, cols=indel type)
+amplicon_pos,del,ins
+37,0.0,0.0
+70,0.0,0.0
+90,0.0,0.0
+355,0.0,0.0
+621,0.0,0.0
+641,0.0,0.0
+674,0.0,0.0
+

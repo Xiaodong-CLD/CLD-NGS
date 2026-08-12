@@ -1,0 +1,42 @@
+#!/bin/bash -l
+#SBATCH -J Unmap_analysis
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=24
+#SBATCH --time=0-10:00:00
+#SBATCH --qos=normal
+ 
+echo "== Starting run at $(date)"
+echo "== Job ID: ${SLURM_JOBID}"
+echo "== Node list: ${SLURM_NODELIST}"
+echo "== Submit dir. : ${SLURM_SUBMIT_DIR}"
+# Your more useful application can be started below!
+
+# Make sure to create the Result directory inside the same directory where the job script is located
+mkdir -p "${SLURM_SUBMIT_DIR}/Result"
+
+conda activate unmap_analysis
+
+# Specify the directory where your .fa files are stored
+data_dir="${SLURM_SUBMIT_DIR}/plasmids_data"
+
+# Specify the directory where you want the STAR index to be stored
+genome_dir="${SLURM_SUBMIT_DIR}/plasmids_data/plasmid_star_dir"
+
+# Concatenate all .fa files into plasmid.fa
+cat ${data_dir}/*.fa > ${data_dir}/plasmid.fa
+
+# Run STAR to create the genome index
+STAR --runMode genomeGenerate --genomeDir ${genome_dir} --genomeFastaFiles ${data_dir}/plasmid.fa --runThreadN 24
+
+PIPELINE_SCRIPT_PATH="$(dirname "$SLURM_SUBMIT_DIR")/voof/unmap-pip/scripts/analysis/unmap_analysis.sh"
+
+${PIPELINE_SCRIPT_PATH} ${SLURM_SUBMIT_DIR}/samples_bam_data/ ${genome_dir} $(dirname "$SLURM_SUBMIT_DIR")/voof/unmap-pip/viral_db/unmasked_virus_dir_v3/
+
+
+
+
+
+
+
+
+
