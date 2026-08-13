@@ -214,7 +214,10 @@ def normalize_path(raw: str) -> pathlib.Path:
 # Output root & run history
 # ---------------------------------------------------------------------------
 
-OUTPUT_ROOT = pathlib.Path("/home/robolab/cindy_ren/ngs/pipeline_outputs")
+# Resolve relative to this file so every repo clone writes to its own
+# pipeline_outputs/ directory (ngs/pipeline_outputs/) regardless of CWD
+# or who is running the app.
+OUTPUT_ROOT = pathlib.Path(__file__).parents[1] / "pipeline_outputs"
 
 # Run-history (job metadata + logs) lives inside the output root.
 _RUNS_DIR = OUTPUT_ROOT / "run_history"

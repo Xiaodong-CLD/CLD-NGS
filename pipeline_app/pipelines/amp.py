@@ -44,7 +44,7 @@ DISPLAY_NAME = "Amplicon Pipeline"
 
 _CONDA_ENV    = "variant-calling"
 _PIPELINE_DIR = pathlib.Path(__file__).parents[2] / "amp-pip-dev"
-_PIPELINE_SCRIPT = _PIPELINE_DIR / "run_pipeline.py"
+_PIPELINE_SCRIPT = _PIPELINE_DIR / "pipeline_combined.py"
 
 # Widget keys for form pre-fill via st.session_state.
 _FORM_KEYS = {
@@ -53,6 +53,64 @@ _FORM_KEYS = {
     "reference":    "amp_reference",
     "run_name":     "amp_run_name",
 }
+
+
+_FASTQ_EXTS = (".fastq", ".fastq.gz", ".fq", ".fq.gz")
+
+
+def _prepare_input_dir(
+    fastq_dir: pathlib.Path,
+    sample_sheet: pathlib.Path,
+    reference: pathlib.Path,
+    output_dir: pathlib.Path,
+) -> None:
+    """Create the symlink layout that pipeline_combined.py expects.
+
+    output_dir/
+        Fastq/          symlinks to every FASTQ in fastq_dir
+        sample_xlsx/    symlink to sample_sheet
+        reference/      symlink to reference
+
+    Idempotent: re-running updates existing symlinks (ln -sfn semantics).
+    Raises ValueError if no FASTQ files are found.
+    """
+    fastq_target = output_dir / "Fastq"
+    sheet_target = output_dir / "sample_xlsx"
+    ref_target   = output_dir / "reference"
+    for d in (fastq_target, sheet_target, ref_target):
+        d.mkdir(parents=True, exist_ok=True)
+
+    # Symlink FASTQ files.
+    n_fq = 0
+    for src in sorted(fastq_dir.iterdir()):
+        if any(src.name.endswith(ext) for ext in _FASTQ_EXTS):
+            dest = fastq_target / src.name
+            if dest.exists() and not dest.is_symlink():
+                raise ValueError(f"Regular file already occupies FASTQ slot: {dest}")
+            if dest.is_symlink():
+                dest.unlink()
+            dest.symlink_to(src.resolve())
+            n_fq += 1
+    if n_fq == 0:
+        raise ValueError(
+            f"No FASTQ files (.fastq/.fastq.gz/.fq/.fq.gz) found in: {fastq_dir}"
+        )
+
+    # Symlink sample sheet.
+    sheet_dest = sheet_target / sample_sheet.name
+    if sheet_dest.exists() and not sheet_dest.is_symlink():
+        raise ValueError(f"Regular file already occupies sample sheet slot: {sheet_dest}")
+    if sheet_dest.is_symlink():
+        sheet_dest.unlink()
+    sheet_dest.symlink_to(sample_sheet.resolve())
+
+    # Symlink reference FASTA.
+    ref_dest = ref_target / reference.name
+    if ref_dest.exists() and not ref_dest.is_symlink():
+        raise ValueError(f"Regular file already occupies reference slot: {ref_dest}")
+    if ref_dest.is_symlink():
+        ref_dest.unlink()
+    ref_dest.symlink_to(reference.resolve())
 
 
 def _amp_python() -> str:
@@ -191,14 +249,14 @@ def validate_and_build_command(
             "Is the amp-pip-dev directory present?"
         )
 
+    # Prepare the input directory layout expected by pipeline_combined.py.
+    _prepare_input_dir(fastq_dir, sample_sheet, reference, output_dir)
+
     python_exe = _amp_python()
 
     command: list[str] = [
         python_exe, "-u", str(_PIPELINE_SCRIPT),
-        "--sample-sheet", str(sample_sheet),
-        "--fastq-dir",    str(fastq_dir),
-        "--reference",    str(reference),
-        "--output-dir",   str(output_dir),
+        str(output_dir),
     ]
 
     normalized_config = {
