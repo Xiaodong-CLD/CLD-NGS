@@ -193,8 +193,9 @@ def _do_submit(pipeline_mod, normalized_config, command, working_dir):
             working_directory=working_dir,
             output_dir=normalized_config["output_dir"],
         )
-        # Clear the paste-command text area so stale content isn't resubmitted.
-        st.session_state["paste_cmd_area"] = ""
+        # Signal the paste-command text area to clear on the next render.
+        # (Cannot assign to a widget key after it has been instantiated.)
+        st.session_state["_reset_paste_cmd"] = True
         st.rerun()
     except Exception as exc:
         st.session_state["_submit_error"] = str(exc)
@@ -350,6 +351,9 @@ with st.expander("Re-use a previous command (paste to pre-fill form)", expanded=
         "All fields except **Run name** will be filled automatically. "
         "Edit as needed, then click Submit."
     )
+    # Clear the text area if a submission just completed (flag set by _do_submit).
+    if st.session_state.pop("_reset_paste_cmd", False):
+        st.session_state["paste_cmd_area"] = ""
     cmd_text = st.text_area(
         "Previous command",
         key="paste_cmd_area",

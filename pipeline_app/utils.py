@@ -281,11 +281,10 @@ def _write_launch_sh(
 
     script = f"""\
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 cd {shlex.quote(working_dir)}
 {path_export}printf 'running' > {status_path}
-{quoted_cmd} >> {log_path} 2>&1
-_exit=$?
+{quoted_cmd} >> {log_path} 2>&1 && _exit=0 || _exit=$?
 printf '%d' $_exit > {exit_code_path}
 if [ $_exit -eq 0 ]; then
     printf 'completed' > {status_path}
