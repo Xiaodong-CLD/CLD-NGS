@@ -285,6 +285,10 @@ for sample_idx in d:
     if os.path.isdir(cov_src):
         shutil.copytree(cov_src, os.path.join(sample_dir, "coverage-plot-output"),
                         dirs_exist_ok=True)
+        # Also copy into run-level aggregated folder (Results/coverage-plot-output/).
+        agg_cov_dir = os.path.join(args.input_dir, "Results", "coverage-plot-output")
+        pathlib.Path(agg_cov_dir).mkdir(exist_ok=True)
+        shutil.copytree(cov_src, agg_cov_dir, dirs_exist_ok=True)
     # VarScan SNP (amino-annotated) and indel VCFs
     results_varscan_dir = os.path.join(sample_dir, "varscan-output")
     pathlib.Path(results_varscan_dir).mkdir(exist_ok=True)
