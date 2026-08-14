@@ -321,7 +321,7 @@ def submit_job(
 
     session_name = f"pipeline_{pipeline_id}_{job_id[-6:]}"
     submitted_at = datetime.now(timezone.utc).isoformat()
-    human_cmd = shlex.join(command)
+    human_cmd = normalized_config.pop("_human_command", None) or shlex.join(command)
 
     log_file = run_dir / "pipeline.log"
     status_file = run_dir / "status.json"

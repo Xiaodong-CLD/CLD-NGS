@@ -33,11 +33,12 @@ Output layout after the run:
 """
 
 import pathlib
+import shlex
 import subprocess
 
 import streamlit as st
 
-from utils import normalize_path, build_output_dir, OUTPUT_ROOT
+from utils import normalize_path, build_output_dir, format_human_command, OUTPUT_ROOT
 
 PIPELINE_ID  = "amp-pip"
 DISPLAY_NAME = "Amplicon Pipeline"
@@ -265,6 +266,13 @@ def validate_and_build_command(
         "reference":    str(reference),
         "run_name":     run_name,
         "output_dir":   str(output_dir),
+        "_human_command": format_human_command([
+            "pipeline_combined.py",
+            "--fastq-dir",    str(fastq_dir),
+            "--sample-sheet", str(sample_sheet),
+            "--reference",    str(reference),
+            "--output-dir",   str(output_dir),
+        ]),
     }
 
     return normalized_config, command, str(_PIPELINE_DIR)

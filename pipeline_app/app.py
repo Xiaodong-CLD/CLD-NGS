@@ -444,7 +444,10 @@ else:
         st.markdown(f"**Run dir:** `{most_recent['run_dir']}`")
 
     st.markdown("**Command:**")
-    st.code(common.format_human_command(most_recent["command"]), language="bash")
+    st.code(
+        most_recent.get("human_command") or common.format_human_command(most_recent["command"]),
+        language="bash",
+    )
 
     btn_col1, btn_col2, btn_col3 = st.columns([1, 3, 3])
     with btn_col1:
@@ -513,7 +516,10 @@ else:
                 with col2:
                     st.markdown(f"**Run dir:** `{_job['run_dir']}`")
                 st.markdown("**Command:**")
-                st.code(common.format_human_command(_job["command"]), language="bash")
+                st.code(
+                    _job.get("human_command") or common.format_human_command(_job["command"]),
+                    language="bash",
+                )
                 st.markdown("**Recent log output:**")
                 _log = common.tail_log(_job)
                 if _log.strip():
