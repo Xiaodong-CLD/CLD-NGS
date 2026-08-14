@@ -281,11 +281,10 @@ def _write_launch_sh(
 
     script = f"""\
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 cd {shlex.quote(working_dir)}
 {path_export}printf 'running' > {status_path}
-{quoted_cmd} >> {log_path} 2>&1
-_exit=$?
+{quoted_cmd} >> {log_path} 2>&1 && _exit=0 || _exit=$?
 printf '%d' $_exit > {exit_code_path}
 if [ $_exit -eq 0 ]; then
     printf 'completed' > {status_path}
@@ -322,7 +321,7 @@ def submit_job(
 
     session_name = f"pipeline_{pipeline_id}_{job_id[-6:]}"
     submitted_at = datetime.now(timezone.utc).isoformat()
-    human_cmd = shlex.join(command)
+    human_cmd = normalized_config.pop("_human_command", None) or shlex.join(command)
 
     log_file = run_dir / "pipeline.log"
     status_file = run_dir / "status.json"
@@ -1111,6 +1110,10 @@ def format_human_command(command: list[str]) -> str:
     """
     # Drop leading python/-u so display starts from the script name.
     args = list(command)
+    # If the first positional arg is a Python interpreter, remove it.
+    if args and not args[0].startswith("-"):
+        if re.match(r"python\d*(\.\d+)?$", pathlib.Path(args[0]).name):
+            args.pop(0)
     while args and args[0] in ("-u",):
         args.pop(0)
     if args and not args[0].startswith("-"):

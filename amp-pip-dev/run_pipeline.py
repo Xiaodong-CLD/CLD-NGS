@@ -33,7 +33,7 @@ import subprocess
 import sys
 
 _HERE = pathlib.Path(__file__).parent.resolve()
-_PREPARE_SH = _HERE / "tools" / "prepare_pipeline_input.sh"
+_PREPARE_SH = _HERE / "prepare_pipeline_input.sh"
 _PIPELINE_COMBINED = _HERE / "pipeline_combined.py"
 
 
