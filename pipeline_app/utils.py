@@ -1110,6 +1110,10 @@ def format_human_command(command: list[str]) -> str:
     """
     # Drop leading python/-u so display starts from the script name.
     args = list(command)
+    # If the first positional arg is a Python interpreter, remove it.
+    if args and not args[0].startswith("-"):
+        if re.match(r"python\d*(\.\d+)?$", pathlib.Path(args[0]).name):
+            args.pop(0)
     while args and args[0] in ("-u",):
         args.pop(0)
     if args and not args[0].startswith("-"):
